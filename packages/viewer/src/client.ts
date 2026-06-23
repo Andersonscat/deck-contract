@@ -30,6 +30,8 @@ export const CHROME_CSS = `
 .dc-el:hover{ border-color:#ec5a13; }
 .dc-el .dc-prev{ background:#13151b; height:84px; display:flex; flex-direction:column; justify-content:center; align-items:flex-start; gap:5px; padding:14px; overflow:hidden; }
 .dc-el .dc-lbl{ display:block; padding:8px; font-size:12px; color:#333; }
+.dc-back{ display:inline-flex; align-items:center; gap:6px; border:none; background:none; color:#5b606b; font-size:12px; cursor:pointer; padding:0 0 10px; }
+.dc-back:hover{ color:#1f2330; }
 
 .dc-swatches{ display:flex; flex-wrap:wrap; gap:10px; }
 .dc-swatch{ width:40px; height:40px; border-radius:8px; border:1px solid #d7dae0; cursor:pointer; }
@@ -237,9 +239,10 @@ export const CLIENT_JS = `
   }
   function showVariants(type){
     if(!elementsPanel) return; var vs=VARIANTS[type]; if(!vs){ restoreElements(); return; }
-    var html='<h4>'+cap(type)+' styles</h4><div class="dc-grid">';
+    var html='<button id="dc-el-back" class="dc-back"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>Elements</button><h4>'+cap(type)+' styles</h4><div class="dc-grid">';
     for(var i=0;i<vs.length;i++){ html+='<button class="dc-el" data-variant="'+i+'"><div class="dc-prev">'+variantPreview(type,vs[i])+'</div><span class="dc-lbl">'+vs[i].label+'</span></button>'; }
     elementsPanel.innerHTML=html+'</div>';
+    var back=document.getElementById('dc-el-back'); if(back) back.onclick=function(ev){ ev.stopPropagation(); restoreElements(); };
     var cards=[].slice.call(elementsPanel.querySelectorAll('[data-variant]'));
     for(var k=0;k<cards.length;k++){ (function(card){ card.onclick=function(){ if(!sel) return; var v=vs[parseInt(card.getAttribute('data-variant'),10)]; var keys=Object.keys(v.ops); if(!keys.length) return; op(keys.map(function(prop){ return {op:'set_token',nodeId:sel.getAttribute('data-cid'),prop:prop,value:'token://'+propNs(prop)+'/'+v.ops[prop]}; })); }; })(cards[k]); }
   }
