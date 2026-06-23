@@ -40,15 +40,18 @@ export const CHROME_CSS = `
 .dc-frame > section{ transform-origin:top left; }
 [data-cid]{ cursor:pointer; }
 .dc-selected{ outline:2px solid #ec5a13 !important; outline-offset:-2px; }
-#dc-tool{ position:fixed; display:none; align-items:center; flex-wrap:wrap; gap:6px; max-width:92vw; background:#111; border-radius:9px; padding:5px 8px; z-index:40; color:#cdd2da; font:11px -apple-system,Segoe UI,sans-serif; }
-#dc-tool button{ border:none; background:#2a2d34; color:#fff; height:28px; min-width:28px; padding:0 9px; border-radius:6px; cursor:pointer; font-size:12px; }
-#dc-tool button:hover{ background:#3a3e47; }
-#dc-tool select,#dc-tool input{ height:28px; border:1px solid #3a3e47; background:#2a2d34; color:#fff; border-radius:6px; font-size:12px; }
-#dc-tool input.dc-t-text{ width:160px; padding:0 8px; }
-#dc-tool select{ padding:0 4px; max-width:120px; }
-#dc-tool .dc-t-al{ display:flex; gap:2px; }
-#dc-tool .dc-t-al button{ min-width:28px; padding:0; }
-#dc-tool .dc-t-al button.on{ background:#ec5a13; }
+#dc-topbar{ height:50px; flex:none; display:flex; align-items:center; gap:8px; padding:0 16px; background:#fff; border-bottom:1px solid #e2e4e9; overflow-x:auto; }
+#dc-tool{ display:flex; align-items:center; gap:8px; font:12px -apple-system,Segoe UI,sans-serif; color:#5b606b; white-space:nowrap; }
+#dc-tool.dc-empty{ color:#9aa0aa; }
+#dc-tool .dc-lbl{ color:#9298a3; }
+#dc-tool input.dc-t-text{ height:30px; width:210px; border:1px solid #d7dae0; border-radius:7px; padding:0 10px; background:#fff; color:#222; font-size:13px; }
+#dc-tool select{ height:30px; border:1px solid #d7dae0; border-radius:7px; background:#fff; color:#222; font-size:12px; padding:0 6px; max-width:130px; }
+#dc-tool .dc-t-al{ display:flex; border:1px solid #d7dae0; border-radius:7px; overflow:hidden; }
+#dc-tool .dc-t-al button{ width:32px; height:30px; border:none; border-right:1px solid #eef0f2; background:#fff; color:#444; cursor:pointer; font-size:13px; }
+#dc-tool .dc-t-al button:last-child{ border-right:none; }
+#dc-tool .dc-t-al button.on{ background:#ec5a13; color:#fff; }
+#dc-tool button[data-act]{ height:30px; border:1px solid #d7dae0; background:#fff; color:#333; border-radius:7px; padding:0 12px; cursor:pointer; font-size:12px; }
+#dc-tool button[data-act]:hover{ background:#f3f4f6; }
 #dc-flash{ position:absolute; bottom:14px; left:14px; background:#111; color:#fff; padding:7px 12px; border-radius:6px; font-size:12px; opacity:0; transition:opacity .2s; z-index:30; }
 
 #dc-right{ width:330px; flex:none; display:flex; flex-direction:column; background:#fff; border-left:1px solid #d7dae0; }
@@ -89,11 +92,11 @@ export const CLIENT_JS = `
   function flash(m){ var h=document.getElementById('dc-flash'); h.textContent=m; h.style.opacity='1'; setTimeout(function(){ h.style.opacity='0'; },1600); }
   function post(url,obj){ return fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(obj)}).then(function(r){ return r.json(); }); }
 
-  // selection toolbar (slim, floats above the element)
-  function placeTool(){ if(!sel){ tool.style.display='none'; return; } tool.style.display='flex'; var r=sel.getBoundingClientRect(); var w=tool.offsetWidth||320; var left=Math.min(Math.max(8,r.left), window.innerWidth-w-8); tool.style.left=Math.max(8,left)+'px'; tool.style.top=Math.max(8,r.top-42)+'px'; }
+  // the contextual toolbar lives in the fixed top bar (#dc-topbar); no floating
+  var TOOL_EMPTY='Select an element to edit it';
   function setHead(t){ var h=document.getElementById('dc-chat-head'); if(h) h.textContent=t; }
   function deleteNode(cid){ post('/api/op',{ops:[{op:'remove_node',nodeId:cid}]}).then(function(res){ if(res&&res.error) flash('error: '+res.error); else flash('deleted'); }); }
-  function clearSel(){ var n=document.querySelectorAll('.dc-selected'); for(var i=0;i<n.length;i++) n[i].classList.remove('dc-selected'); sel=null; tool.style.display='none'; setHead('AI assistant'); }
+  function clearSel(){ var n=document.querySelectorAll('.dc-selected'); for(var i=0;i<n.length;i++) n[i].classList.remove('dc-selected'); sel=null; setHead('AI assistant'); if(tool){ tool.className='dc-empty'; tool.textContent=TOOL_EMPTY; } }
   function editText(el){ el.setAttribute('contenteditable','true'); el.focus(); var cid=el.getAttribute('data-cid');
     function finish(){ el.removeAttribute('contenteditable'); var txt=(el.textContent||'').replace(/\\s+/g,' ').trim(); post('/api/op',{ops:[{op:'set_text',nodeId:cid,value:txt}]}).then(function(res){ if(res&&res.error) flash('error: '+res.error); }); }
     el.addEventListener('blur',finish,{once:true});
@@ -120,16 +123,16 @@ export const CLIENT_JS = `
     clearSel(); el.classList.add('dc-selected'); sel=el;
     var cid=el.getAttribute('data-cid'); var type=el.getAttribute('data-type');
     setHead('AI · selected: '+type);
-    placeTool();
     fetch('/api/node?id='+encodeURIComponent(cid)).then(function(r){ return r.json(); }).then(function(node){ if(sel!==el) return; buildTool(cid,type,(node&&node.id)?node:null); }).catch(function(){ if(sel===el) buildTool(cid,type,null); });
   }
   function buildTool(cid,type,node){
     var sp=styleProps(type); var th=window.DC_THEME||{}; var st=(node&&node.style)||{}; var cf=contentField(type);
+    tool.className='';
     var html='';
     if(cf){ var val=''; if(node&&node.content){ val = cf==='items' ? ((node.content.items||[]).join(' | ')) : (node.content[cf]||''); } html+='<input class="dc-t-text" placeholder="text" value="'+esc(val)+'">'; }
-    if(sp.font) html+='Font<select class="dc-t-f">'+opts(th.font,tokenKey(st[sp.font]))+'</select>';
-    if(sp.size) html+='Size<select class="dc-t-s">'+opts(th.type,tokenKey(st[sp.size]))+'</select>';
-    if(sp.color) html+='Color<select class="dc-t-c">'+opts(th.color,tokenKey(st[sp.color]))+'</select>';
+    if(sp.font) html+='<span class="dc-lbl">Font</span><select class="dc-t-f">'+opts(th.font,tokenKey(st[sp.font]))+'</select>';
+    if(sp.size) html+='<span class="dc-lbl">Size</span><select class="dc-t-s">'+opts(th.type,tokenKey(st[sp.size]))+'</select>';
+    if(sp.color) html+='<span class="dc-lbl">Color</span><select class="dc-t-c">'+opts(th.color,tokenKey(st[sp.color]))+'</select>';
     if(cf==='text'||cf==='items'){ var al=(node&&node.textAlign)||'left'; html+='<span class="dc-t-al"><button data-al="left"'+(al==='left'?' class="on"':'')+'>L</button><button data-al="center"'+(al==='center'?' class="on"':'')+'>C</button><button data-al="right"'+(al==='right'?' class="on"':'')+'>R</button></span>'; }
     html+='<button data-act="ai" title="set as AI target">AI</button>';
     tool.innerHTML=html;
@@ -143,11 +146,10 @@ export const CLIENT_JS = `
     var sclr=tool.querySelector('.dc-t-c'); if(sclr) sclr.addEventListener('change',function(){ post('/api/op',{ops:[{op:'set_token',nodeId:cid,prop:sp.color,value:'token://color/'+sclr.value}]}); });
     var als=tool.querySelectorAll('.dc-t-al button'); for(var i=0;i<als.length;i++){ (function(btn){ btn.onclick=function(ev){ ev.stopPropagation(); post('/api/op',{ops:[{op:'set_align',nodeId:cid,value:btn.getAttribute('data-al')}]}); }; })(als[i]); }
     var aib=tool.querySelector('[data-act="ai"]'); if(aib) aib.onclick=function(ev){ ev.stopPropagation(); post('/api/selection',{nodeId:cid}).then(function(){ flash('AI target = '+cid); }); };
-    placeTool();
   }
 
-  window.addEventListener('resize',function(){ fitAll(); updateCurrent(); placeTool(); });
-  stage.addEventListener('scroll',function(){ updateCurrent(); placeTool(); });
+  window.addEventListener('resize',function(){ fitAll(); updateCurrent(); });
+  stage.addEventListener('scroll',function(){ updateCurrent(); });
   for(var t=0;t<thumbs.length;t++){ (function(idx){ thumbs[idx].onclick=function(){ goTo(idx); }; })(t); }
   document.addEventListener('keydown',function(e){
     var t=e.target, tag=t&&t.tagName;
@@ -180,7 +182,7 @@ export const CLIENT_JS = `
 
   // select / edit on the stage
   document.addEventListener('click',function(e){
-    if(e.target.closest('#dc-tool')||e.target.closest('#dc-left')||e.target.closest('#dc-right')) return;
+    if(e.target.closest('#dc-topbar')||e.target.closest('#dc-left')||e.target.closest('#dc-right')) return;
     var el=e.target.closest('#dc-stage [data-cid]');
     if(!el){ clearSel(); return; }
     e.preventDefault(); select(el);

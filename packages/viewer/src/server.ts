@@ -123,8 +123,9 @@ export function createViewerServer(opts: ViewerOptions) {
       '<div class="dc-panel2" data-panel="brand"><h4>Theme colors</h4><div class="dc-swatches">' + swatches + "</div></div>" +
       "</div></div>" +
       '<div id="dc-center">' +
+      '<div id="dc-topbar"><div id="dc-tool" class="dc-empty">Select an element to edit it</div></div>' +
       '<div id="dc-stage">' + frames + "</div>" +
-      '<div id="dc-tool"></div><div id="dc-flash"></div>' +
+      '<div id="dc-flash"></div>' +
       "</div>" +
       '<div id="dc-right"><div id="dc-chat-head">AI assistant</div>' +
       '<div id="dc-chat"><div class="dc-msg sys">' +
