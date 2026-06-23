@@ -310,7 +310,7 @@ export const CLIENT_JS = `
   });
   // hover frame + free drag (move by coordinates -> set_frame / move_to)
   var dragHover=null, candEl=null, downPt=null, dragging=false, dragNode=null, dragged=false;
-  var dragStart=null, dragSc=1, dragHasFrame=false, coordEl=null;
+  var dragStart=null, dragSc=1, dragHasFrame=false, coordEl=null, dragLast=null;
   function hbox(){ if(!dragHover){ dragHover=document.createElement('div'); dragHover.id='dc-hover'; document.body.appendChild(dragHover); } return dragHover; }
   function cbox(){ if(!coordEl){ coordEl=document.createElement('div'); coordEl.id='dc-coord'; document.body.appendChild(coordEl); } return coordEl; }
   function showBox(el){ var h=hbox(); var r=el.getBoundingClientRect(); h.className=''; h.style.display='block'; h.style.left=r.left+'px'; h.style.top=r.top+'px'; h.style.width=r.width+'px'; h.style.height=r.height+'px'; }
@@ -322,7 +322,7 @@ export const CLIENT_JS = `
   document.addEventListener('mousemove',function(e){
     if(resizing){ doResize(e); return; }
     if(dragging){
-      var s=snapDrag(e);
+      var s=snapDrag(e); dragLast=s; // remember the last shown position so the drop commits EXACTLY it
       var sdx=(s.L-dragStart.x/100*1280)*dragSc, sdy=(s.T-dragStart.y/100*720)*dragSc;
       dragNode.style.transform='translate('+sdx+'px,'+sdy+'px)';
       var c=cbox(); c.style.display='block'; c.textContent='x: '+Math.round(s.L)+' pt   y: '+Math.round(s.T)+' pt';
@@ -335,7 +335,7 @@ export const CLIENT_JS = `
   });
   document.addEventListener('mouseup',function(e){ if(resizing){ endResize(); candEl=null; return; } if(dragging) endDrag(e); candEl=null; });
   function startDrag(){
-    dragging=true; dragNode=candEl; dragged=true; hideBox(); hideHandles(); document.body.style.cursor='grabbing';
+    dragging=true; dragNode=candEl; dragged=true; dragLast=null; hideBox(); hideHandles(); document.body.style.cursor='grabbing';
     document.body.style.userSelect='none'; var sg=window.getSelection&&window.getSelection(); if(sg&&sg.removeAllRanges) sg.removeAllRanges();
     // Coordinate origin = the slide <section> (the absolute-positioning containing block,
     // because it carries transform:scale). Using .dc-frame here was the latent bug: the frame
@@ -439,7 +439,7 @@ export const CLIENT_JS = `
     return ops;
   }
   function endDrag(e){
-    var s=snapDrag(e);
+    var s=dragLast||snapDrag(e); // commit the last position the user actually saw (snap can flip if the cursor jitters on release)
     var nx=round3(s.L/1280*100), ny=round3(s.T/720*100);
     var cid=dragNode.getAttribute('data-cid');
     // Freeze the other leaves BEFORE moving this one out of flow (captures their current rects).
