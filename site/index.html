@@ -37,8 +37,23 @@
     overflow-x: hidden;
   }
   a { color: inherit; text-decoration: none; }
-  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 28px; }
-  section { padding: 96px 0; }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 28px; width: 100%; }
+  section {
+    min-height: 100vh;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 96px 0;
+  }
+  @media (max-height: 720px) { section { min-height: auto; padding: 90px 0; } }
+
+  /* ---- bold section beats ---- */
+  .dark-sec { background: var(--matcha-deep); }
+  .dark-sec .sec-head h2 { color: var(--foam-2); }
+  .dark-sec .sec-head p  { color: #dfe8d3; }
+  .tint-sec { background: var(--matcha-wash); }
+
+  /* ---- scroll reveal ---- */
+  .reveal { opacity: 0; transform: translateY(34px); transition: opacity .7s cubic-bezier(.22,.61,.36,1), transform .7s cubic-bezier(.22,.61,.36,1); }
+  .reveal.in { opacity: 1; transform: none; }
   h1, h2, h3 { line-height: 1.08; letter-spacing: -0.02em; }
   .muted { color: var(--ink-soft); }
 
@@ -71,7 +86,7 @@
   @media (max-width: 720px) { .nav-links a.lnk { display: none; } }
 
   /* ---------- hero ---------- */
-  .hero { padding-top: 64px; padding-bottom: 64px; }
+  .hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding-top: 90px; padding-bottom: 48px; }
   .hero .wrap { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 48px; align-items: center; }
   .hero h1 { font-size: 58px; font-weight: 900; }
   .hero h1 .accent { color: var(--matcha-deep); }
@@ -92,11 +107,13 @@
     border-radius: var(--radius);
     border: 2px solid #ece9dd;
     padding: 26px;
+    transition: transform .16s ease, border-color .16s ease;
   }
+  .card:hover { transform: translateY(-5px); border-color: var(--matcha-soft); }
 
   /* ---------- section heading ---------- */
-  .sec-head { max-width: 640px; margin-bottom: 48px; }
-  .sec-head h2 { font-size: 38px; font-weight: 900; }
+  .sec-head { max-width: 680px; margin-bottom: 52px; }
+  .sec-head h2 { font-size: 46px; font-weight: 900; }
   .sec-head p { font-size: 18px; margin-top: 14px; }
 
   /* ---------- problem before/after ---------- */
@@ -226,6 +243,31 @@
 </head>
 <body>
 
+<!-- ============ SHEEP SYMBOL (fluffy latte-art style) ============ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="sheep" viewBox="0 0 60 54">
+    <!-- wool: cloud of overlapping bumps -->
+    <g fill="#ffffff">
+      <ellipse cx="33" cy="32" rx="17" ry="12"/>
+      <circle cx="21" cy="21" r="8"/>
+      <circle cx="31" cy="16" r="8.5"/>
+      <circle cx="41" cy="17" r="8.5"/>
+      <circle cx="49" cy="23" r="8"/>
+      <circle cx="51" cy="32" r="8"/>
+      <circle cx="18" cy="31" r="7.5"/>
+      <circle cx="23" cy="41" r="7.5"/>
+      <circle cx="34" cy="43" r="7.5"/>
+      <circle cx="45" cy="41" r="7.5"/>
+    </g>
+    <!-- head: small dark, with ears -->
+    <ellipse cx="10" cy="12" rx="2.3" ry="3.4" fill="#2f2f2f" transform="rotate(-30 10 12)"/>
+    <ellipse cx="18" cy="11" rx="2.3" ry="3.4" fill="#2f2f2f" transform="rotate(22 18 11)"/>
+    <ellipse cx="14" cy="17" rx="6.2" ry="5.6" fill="#3a3a3a"/>
+    <ellipse cx="11.5" cy="19" rx="2.6" ry="2" fill="#4a4a4a"/>
+    <circle cx="13" cy="15.5" r="0.95" fill="#ffffff"/>
+  </symbol>
+</svg>
+
 <!-- ============ NAV ============ -->
 <nav>
   <div class="wrap">
@@ -281,27 +323,9 @@
           <circle cx="130" cy="156" r="1.8"/>
         </g>
         <!-- sheep on the matcha (latte art) -->
-        <g class="float-anim">
-          <g transform="translate(150,135)">
-            <ellipse cx="0" cy="2" rx="13" ry="9" fill="#fff"/>
-            <circle cx="-7" cy="0" r="5" fill="#fff"/><circle cx="7" cy="0" r="5" fill="#fff"/><circle cx="0" cy="-4" r="6" fill="#fff"/>
-            <ellipse cx="0" cy="-3" rx="4.5" ry="4" fill="#3a3a3a"/>
-          </g>
-        </g>
-        <g class="float-anim d2">
-          <g transform="translate(225,150)">
-            <ellipse cx="0" cy="2" rx="12" ry="8" fill="#fff"/>
-            <circle cx="-6" cy="0" r="4.5" fill="#fff"/><circle cx="6" cy="0" r="4.5" fill="#fff"/><circle cx="0" cy="-4" r="5.5" fill="#fff"/>
-            <ellipse cx="0" cy="-3" rx="4" ry="3.5" fill="#3a3a3a"/>
-          </g>
-        </g>
-        <g class="float-anim d3">
-          <g transform="translate(185,165)">
-            <ellipse cx="0" cy="2" rx="11" ry="7.5" fill="#fff"/>
-            <circle cx="-6" cy="0" r="4" fill="#fff"/><circle cx="6" cy="0" r="4" fill="#fff"/><circle cx="0" cy="-3.5" r="5" fill="#fff"/>
-            <ellipse cx="0" cy="-3" rx="3.6" ry="3.2" fill="#3a3a3a"/>
-          </g>
-        </g>
+        <use class="float-anim"    href="#sheep" x="133" y="123" width="34" height="30.6"/>
+        <use class="float-anim d2" href="#sheep" x="206" y="137" width="28" height="25.2"/>
+        <use class="float-anim d3" href="#sheep" x="172" y="154" width="25" height="22.5"/>
       </svg>
     </div>
   </div>
@@ -337,7 +361,7 @@
 </section>
 
 <!-- ============ HOW IT WORKS ============ -->
-<section id="how" style="background:var(--foam-2);">
+<section id="how" class="dark-sec">
   <div class="wrap">
     <div class="sec-head">
       <h2>Three calls, no redraw.</h2>
@@ -374,7 +398,7 @@
 </section>
 
 <!-- ============ DEMO ============ -->
-<section id="demo">
+<section id="demo" class="tint-sec">
   <div class="wrap">
     <div class="sec-head">
       <h2>Click an element. That's the scope.</h2>
@@ -585,11 +609,11 @@
 <section id="cta">
   <div class="wrap">
     <div class="cta">
-      <svg class="float-sheep float-anim" style="left:40px;top:30px;" width="46" height="40" viewBox="0 0 40 34">
-        <ellipse cx="20" cy="20" rx="13" ry="9" fill="#fff"/><circle cx="13" cy="18" r="5" fill="#fff"/><circle cx="27" cy="18" r="5" fill="#fff"/><circle cx="20" cy="13" r="6" fill="#fff"/><ellipse cx="20" cy="14" rx="4.5" ry="4" fill="#3a3a3a"/>
+      <svg class="float-sheep float-anim" style="left:44px;top:30px;" width="58" height="52" viewBox="0 0 60 54">
+        <use href="#sheep" width="60" height="54"/>
       </svg>
-      <svg class="float-sheep float-anim d2" style="right:50px;top:44px;" width="38" height="32" viewBox="0 0 40 34">
-        <ellipse cx="20" cy="20" rx="13" ry="9" fill="#fff"/><circle cx="13" cy="18" r="5" fill="#fff"/><circle cx="27" cy="18" r="5" fill="#fff"/><circle cx="20" cy="13" r="6" fill="#fff"/><ellipse cx="20" cy="14" rx="4.5" ry="4" fill="#3a3a3a"/>
+      <svg class="float-sheep float-anim d2" style="right:54px;top:44px;" width="46" height="41" viewBox="0 0 60 54">
+        <use href="#sheep" width="60" height="54"/>
       </svg>
       <h2>Give your AI a flock to work with.</h2>
       <p>Drop in the MCP server and your assistant edits real components today.</p>
@@ -649,6 +673,30 @@
       const old = btn.textContent; btn.textContent = 'Copied'; setTimeout(()=>btn.textContent=old, 1400);
     });
   }
+
+  // ---- scroll reveal with stagger ----
+  // stagger children inside grid groups
+  ['.steps', '.verts', '.flock', '.ba'].forEach(sel => {
+    document.querySelectorAll(sel).forEach(group => {
+      [...group.children].forEach((child, i) => { child.style.transitionDelay = (i * 0.09) + 's'; });
+    });
+  });
+  // stagger hero entrance
+  ['.hero h1', '.hero p.sub', '.hero .cta-row'].forEach((sel, i) => {
+    const el = document.querySelector(sel); if (el) el.style.transitionDelay = (i * 0.12) + 's';
+  });
+  // mark targets
+  const targets = [
+    '.hero h1', '.hero p.sub', '.hero .cta-row', '.hero-art',
+    '.sec-head', '.ba-card', '.step', '.slide', '.inspect',
+    '.vert', '.dev', '.chip', '.cta'
+  ];
+  targets.forEach(sel => document.querySelectorAll(sel).forEach(el => el.classList.add('reveal')));
+  // observe
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
 </script>
 </body>
 </html>
