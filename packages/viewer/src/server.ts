@@ -190,7 +190,10 @@ export function createViewerServer(opts: ViewerOptions) {
         const { ops } = JSON.parse(await body(req));
         try {
           await commit(ops);
-          return json({ ok: true, ...hist() });
+          // Return the recompiled slides so the client can reconcile its cache without the
+          // SSE round-trip rebuilding (and flashing) the slide it already updated optimistically.
+          const { slides } = compileSlides(await readDeck());
+          return json({ ok: true, ...hist(), slides });
         } catch (e) {
           return json({ error: e instanceof Error ? e.message : String(e) });
         }

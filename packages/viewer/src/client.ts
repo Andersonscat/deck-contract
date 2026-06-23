@@ -164,7 +164,39 @@ export const CLIENT_JS = `
   }
   function tokenKey(ref){ if(!ref) return ''; var m=/token:\\/\\/[a-z]+\\/([A-Za-z0-9-]+)/.exec(ref); return m?m[1]:''; }
   function cap(s){ return (''+s).charAt(0).toUpperCase()+(''+s).slice(1); }
-  function op(ops){ return post('/api/op',{ops:ops}).then(function(res){ if(res&&res.error) flash('error: '+res.error); }); }
+  // Apply edits optimistically to the live DOM so style/position changes are instant and the
+  // slide doesn't have to be rebuilt (which flashes + drops the selection). Returns true only
+  // if EVERY op was something we can render locally; structural ops fall back to a rebuild.
+  var opInFlight=0;
+  var CSS_PROP={ color:'color', font:'font-family', size:'font-size', marker:'--marker-color', valueColor:'color', valueFont:'font-family', valueSize:'font-size', labelColor:'--label-color', labelSize:'--label-size', captionColor:'--caption-color', captionSize:'--caption-size', radius:'border-radius', background:'background' };
+  function tokenToVarJS(ref){ var m=/^token:\\/\\/([a-z][a-z0-9]*)\\/([A-Za-z0-9][A-Za-z0-9-]*)$/.exec(ref); return m?'var(--'+m[1]+'-'+m[2]+')':ref; }
+  function applyOptimistic(ops){
+    for(var i=0;i<ops.length;i++){ var o=ops[i]; var el=document.querySelector('#dc-stage [data-cid="'+o.nodeId+'"]'); if(!el) return false;
+      if(o.op==='set_token'){ el.style.setProperty(CSS_PROP[o.prop]||('--'+o.prop), tokenToVarJS(o.value)); }
+      else if(o.op==='set_align'){ el.style.textAlign=o.value; }
+      else if(o.op==='set_frame'){ var f=o.frame; el.style.position='absolute'; el.style.left=f.x+'%'; el.style.top=f.y+'%'; if(f.w!=null) el.style.width=f.w+'%'; if(f.h!=null) el.style.height=f.h+'%'; }
+      else if(o.op==='move_to'){ el.style.left=o.x+'%'; el.style.top=o.y+'%'; }
+      else return false;
+    }
+    return true;
+  }
+  function applySlides(slides,rebuild){
+    for(var i=0;i<frames.length;i++){ if(!slides[i]||lastSlideHtml[i]===slides[i].html) continue;
+      if(rebuild) frames[i].innerHTML=slides[i].html;
+      if(thumbs[i]) thumbs[i].innerHTML='<span class="dc-no">'+(i+1)+'</span>'+stripIds(slides[i].html);
+      lastSlideHtml[i]=slides[i].html;
+    }
+    if(rebuild){ fitAll(); var prev=sel?sel.getAttribute('data-cid'):null; clearSel(); if(prev){ var again=document.querySelector('#dc-stage [data-cid="'+prev+'"]'); if(again) select(again); } }
+    refreshHist();
+  }
+  function op(ops){
+    var optimistic=applyOptimistic(ops); opInFlight++;
+    return post('/api/op',{ops:ops}).then(function(res){ opInFlight--;
+      if(res&&res.error){ flash('error: '+res.error); forceRebuild(); return; }
+      if(res){ setHist(res); if(res.slides) applySlides(res.slides,!optimistic); }
+    },function(){ opInFlight--; forceRebuild(); });
+  }
+  function forceRebuild(){ fetch('/api/slides').then(function(r){ return r.json(); }).then(function(d){ if(d&&d.slides) applySlides(d.slides,true); }).catch(function(){}); }
   function group(label,el){ var g=document.createElement('div'); g.className='dc-grp'; if(label){ var l=document.createElement('span'); l.className='dc-lbl'; l.textContent=label; g.appendChild(l); } g.appendChild(el); return g; }
   function makeDropdown(o){
     var wrap=document.createElement('div'); wrap.className='dc-dd';
@@ -528,7 +560,7 @@ export const CLIENT_JS = `
       var theme=document.getElementById('dc-theme'); if(theme&&typeof data.css==='string') theme.textContent=data.css;
       var prev=sel?sel.getAttribute('data-cid'):null;
       var editing=document.querySelector('#dc-stage [contenteditable="true"]');
-      if(editing||dragging||resizing) return; // don't clobber an in-progress text edit / drag / resize
+      if(editing||dragging||resizing||opInFlight>0) return; // don't clobber an edit/drag/resize or our own in-flight op (its response reconciles the cache)
       // Only re-render slides whose HTML actually changed, so a single edit doesn't rebuild
       // every slide (that full rebuild is what felt like a full page reload).
       var changed=false;
