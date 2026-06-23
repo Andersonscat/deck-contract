@@ -50,6 +50,11 @@ export const CHROME_CSS = `
 .dc-guide{ position:fixed; display:none; background:#ff2d6e; }
 .dc-guide.v{ width:2px; }
 .dc-guide.h{ height:2px; }
+#dc-dist{ position:fixed; left:0; top:0; pointer-events:none; z-index:37; }
+.dc-dseg{ position:fixed; background:#ff2d6e; }
+.dc-dseg.h{ height:2px; } .dc-dseg.v{ width:2px; }
+.dc-dcap{ position:fixed; background:#ff2d6e; }
+.dc-dlbl{ position:fixed; transform:translate(-50%,-50%); background:#ff2d6e; color:#fff; font:10px/1 -apple-system,Segoe UI,sans-serif; padding:2px 5px; border-radius:4px; white-space:nowrap; }
 #dc-handles{ position:fixed; left:0; top:0; pointer-events:none; z-index:38; display:none; }
 #dc-handles.on{ display:block; }
 .dc-h{ position:fixed; width:10px; height:10px; background:#fff; border:1.5px solid #4a6cf7; border-radius:2px; pointer-events:auto; }
@@ -307,7 +312,7 @@ export const CLIENT_JS = `
     var er=dragNode.getBoundingClientRect();
     dragHasFrame=(getComputedStyle(dragNode).position==='absolute');
     dragStart={ x:(er.left-frr.left)/dragSc/1280*100, y:(er.top-frr.top)/dragSc/720*100, w:er.width/dragSc/1280*100, h:er.height/dragSc/720*100, mx:downPt.x, my:downPt.y };
-    var tg=buildTargets(dragNode,fr,dragSc); vTargets=tg.vT; hTargets=tg.hT;
+    var tg=buildTargets(dragNode,fr,dragSc); vTargets=tg.vT; hTargets=tg.hT; snapBoxes=tg.boxes;
     dragNode.style.zIndex='6';
   }
   // Smart alignment guides (phase 3a + 3b): snap the active box per axis to the slide
@@ -315,35 +320,76 @@ export const CLIENT_JS = `
   // (1280x720); the threshold is a screen-px value / scale so the magnet feels the same at
   // any zoom. Each target carries a cross-axis extent [lo,hi] so its guide line spans only
   // the involved boxes, not the whole slide. Slide/centre targets come first -> they win ties.
-  var vTargets=[], hTargets=[], guidesEl=null;
+  var vTargets=[], hTargets=[], snapBoxes=[], guidesEl=null, distEl=null;
   function buildTargets(activeEl,sec,scl){
     var secr=sec.getBoundingClientRect();
     var vT=[{v:640,lo:0,hi:720},{v:0,lo:0,hi:720},{v:1280,lo:0,hi:720}];
     var hT=[{v:360,lo:0,hi:1280},{v:0,lo:0,hi:1280},{v:720,lo:0,hi:1280}];
+    var boxes=[];
     var others=sec.querySelectorAll('[data-cid]');
     for(var i=0;i<others.length;i++){ var o=others[i]; if(o===activeEl||o.tagName==='SECTION'||o.contains(activeEl)||activeEl.contains(o)) continue;
       var r=o.getBoundingClientRect(); var L=(r.left-secr.left)/scl, T=(r.top-secr.top)/scl, W=r.width/scl, H=r.height/scl;
       vT.push({v:L+W/2,lo:T,hi:T+H},{v:L,lo:T,hi:T+H},{v:L+W,lo:T,hi:T+H});
       hT.push({v:T+H/2,lo:L,hi:L+W},{v:T,lo:L,hi:L+W},{v:T+H,lo:L,hi:L+W});
+      boxes.push({L:L,T:T,W:W,H:H});
     }
-    return { vT:vT, hT:hT };
+    return { vT:vT, hT:hT, boxes:boxes };
   }
   function snapAxis(cands,targets,TH){ var best=null; for(var i=0;i<cands.length;i++){ for(var j=0;j<targets.length;j++){ var d=targets[j].v-cands[i]; if(Math.abs(d)<=TH&&(!best||Math.abs(d)<Math.abs(best.delta))) best={delta:d,t:targets[j]}; } } return best; }
   function snapEdge(c,targets,TH){ var best=null; for(var j=0;j<targets.length;j++){ var d=Math.abs(targets[j].v-c); if(d<=TH&&(!best||d<best.d)) best={d:d,t:targets[j]}; } return best?best.t:null; }
+  // Phase 3c distribution: snap so the dragged box sits with EQUAL gaps between its nearest
+  // left/right (or top/bottom) neighbour on the same row/column. Returns the snapped position
+  // + the two equal gaps so we can draw measured spacing indicators.
+  function distributeSnap(L,T,W,H,TH){
+    var rx=null, ry=null;
+    var la=null, ra=null; // horizontal neighbours (must vertically overlap)
+    var ta=null, ba=null; // vertical neighbours (must horizontally overlap)
+    for(var i=0;i<snapBoxes.length;i++){ var bx=snapBoxes[i];
+      if(Math.min(T+H,bx.T+bx.H)-Math.max(T,bx.T)>0){ // vertical overlap -> horizontal neighbour
+        if(bx.L+bx.W<=L+1){ if(!la||bx.L+bx.W>la.L+la.W) la=bx; }
+        else if(bx.L>=L+W-1){ if(!ra||bx.L<ra.L) ra=bx; }
+      }
+      if(Math.min(L+W,bx.L+bx.W)-Math.max(L,bx.L)>0){ // horizontal overlap -> vertical neighbour
+        if(bx.T+bx.H<=T+1){ if(!ta||bx.T+bx.H>ta.T+ta.H) ta=bx; }
+        else if(bx.T>=T+H-1){ if(!ba||bx.T<ba.T) ba=bx; }
+      }
+    }
+    if(la&&ra){ var g=((ra.L)-(la.L+la.W)-W)/2; if(g>0){ var tL=la.L+la.W+g; if(Math.abs(L-tL)<=TH) rx={L:tL,gap:g,a:la,b:ra}; } }
+    if(ta&&ba){ var gy=((ba.T)-(ta.T+ta.H)-H)/2; if(gy>0){ var tT=ta.T+ta.H+gy; if(Math.abs(T-tT)<=TH) ry={T:tT,gap:gy,a:ta,b:ba}; } }
+    return { x:rx, y:ry };
+  }
   function snapDrag(e){
     var W=dragStart.w/100*1280, H=dragStart.h/100*720;
     var L=dragStart.x/100*1280+(e.clientX-dragStart.mx)/dragSc;
     var T=dragStart.y/100*720+(e.clientY-dragStart.my)/dragSc;
-    var sx=null, sy=null;
-    if(!e.altKey){ var TH=6/dragSc; sx=snapAxis([L,L+W/2,L+W],vTargets,TH); if(sx) L+=sx.delta; sy=snapAxis([T,T+H/2,T+H],hTargets,TH); if(sy) T+=sy.delta; }
-    return { L:L, T:T, W:W, H:H, sx:sx, sy:sy };
+    var sx=null, sy=null, dist={x:null,y:null};
+    if(!e.altKey){ var TH=6/dragSc;
+      dist=distributeSnap(L,T,W,H,TH);
+      if(dist.x){ L=dist.x.L; } else { sx=snapAxis([L,L+W/2,L+W],vTargets,TH); if(sx) L+=sx.delta; }
+      if(dist.y){ T=dist.y.T; } else { sy=snapAxis([T,T+H/2,T+H],hTargets,TH); if(sy) T+=sy.delta; }
+    }
+    return { L:L, T:T, W:W, H:H, sx:sx, sy:sy, dist:dist };
   }
   function gbox(){ if(!guidesEl){ var c=document.createElement('div'); c.id='dc-guides'; var v=document.createElement('div'); v.className='dc-guide v'; var h=document.createElement('div'); h.className='dc-guide h'; c.appendChild(v); c.appendChild(h); document.body.appendChild(c); guidesEl={v:v,h:h}; } return guidesEl; }
   function drawGuides(el,s){ var g=gbox(); var secr=el.closest('section').getBoundingClientRect(); var scl=secr.width/1280;
     if(s.sx){ var loY=Math.min(s.sx.t.lo,s.T), hiY=Math.max(s.sx.t.hi,s.T+s.H); g.v.style.display='block'; g.v.style.left=(secr.left+s.sx.t.v*scl)+'px'; g.v.style.top=(secr.top+loY*scl)+'px'; g.v.style.height=((hiY-loY)*scl)+'px'; } else g.v.style.display='none';
     if(s.sy){ var loX=Math.min(s.sy.t.lo,s.L), hiX=Math.max(s.sy.t.hi,s.L+s.W); g.h.style.display='block'; g.h.style.top=(secr.top+s.sy.t.v*scl)+'px'; g.h.style.left=(secr.left+loX*scl)+'px'; g.h.style.width=((hiX-loX)*scl)+'px'; } else g.h.style.display='none';
+    drawDist(s,secr,scl);
   }
-  function hideGuides(){ if(guidesEl){ guidesEl.v.style.display='none'; guidesEl.h.style.display='none'; } }
+  function distBox(){ if(!distEl){ distEl=document.createElement('div'); distEl.id='dc-dist'; document.body.appendChild(distEl); } return distEl; }
+  function hseg(x1,x2,y,label){ var L=Math.min(x1,x2), len=Math.abs(x2-x1); return '<div class="dc-dseg h" style="left:'+L+'px;top:'+(y-1)+'px;width:'+len+'px"></div><div class="dc-dcap" style="left:'+x1+'px;top:'+(y-5)+'px;width:2px;height:10px"></div><div class="dc-dcap" style="left:'+(x2-2)+'px;top:'+(y-5)+'px;width:2px;height:10px"></div><div class="dc-dlbl" style="left:'+(L+len/2)+'px;top:'+(y-12)+'px">'+label+'</div>'; }
+  function vseg(y1,y2,x,label){ var T=Math.min(y1,y2), len=Math.abs(y2-y1); return '<div class="dc-dseg v" style="left:'+(x-1)+'px;top:'+T+'px;height:'+len+'px"></div><div class="dc-dcap" style="left:'+(x-5)+'px;top:'+y1+'px;width:10px;height:2px"></div><div class="dc-dcap" style="left:'+(x-5)+'px;top:'+(y2-2)+'px;width:10px;height:2px"></div><div class="dc-dlbl" style="left:'+(x+14)+'px;top:'+(T+len/2)+'px">'+label+'</div>'; }
+  function drawDist(s,secr,scl){
+    if(!s.dist||(!s.dist.x&&!s.dist.y)){ hideDist(); return; }
+    var html=''; var SX=function(c){ return secr.left+c*scl; }, SY=function(c){ return secr.top+c*scl; };
+    if(s.dist.x){ var d=s.dist.x; var y=SY(s.T+s.H/2); var lbl=Math.round(d.gap);
+      html+=hseg(SX(d.a.L+d.a.W),SX(s.L),y,lbl)+hseg(SX(s.L+s.W),SX(d.b.L),y,lbl); }
+    if(s.dist.y){ var d2=s.dist.y; var x=SX(s.L+s.W/2); var lbl2=Math.round(d2.gap);
+      html+=vseg(SY(d2.a.T+d2.a.H),SY(s.T),x,lbl2)+vseg(SY(s.T+s.H),SY(d2.b.T),x,lbl2); }
+    distBox().innerHTML=html;
+  }
+  function hideDist(){ if(distEl) distEl.innerHTML=''; }
+  function hideGuides(){ if(guidesEl){ guidesEl.v.style.display='none'; guidesEl.h.style.display='none'; } hideDist(); }
   function endDrag(e){
     var s=snapDrag(e);
     var nx=round3(s.L/1280*100), ny=round3(s.T/720*100);
@@ -383,7 +429,7 @@ export const CLIENT_JS = `
     var fr=sel.closest('section'); var frr=fr.getBoundingClientRect(); rsc=frr.width/1280;
     var rh=sel.getBoundingClientRect();
     startFrame={ x:(rh.left-frr.left)/rsc/1280*100, y:(rh.top-frr.top)/rsc/720*100, w:rh.width/rsc/1280*100, h:rh.height/rsc/720*100 };
-    var tg=buildTargets(sel,fr,rsc); vTargets=tg.vT; hTargets=tg.hT;
+    var tg=buildTargets(sel,fr,rsc); vTargets=tg.vT; hTargets=tg.hT; snapBoxes=tg.boxes;
     resizeStart={ mx:e.clientX, my:e.clientY };
   }
   function doResize(e){
@@ -401,6 +447,9 @@ export const CLIENT_JS = `
       else if(ml){ var tl=snapEdge(x/100*1280,vTargets,TH); if(tl){ sx={t:tl}; var nx=tl.v/1280*100; w=w+(x-nx); x=nx; } }
       if(mb){ var tb=snapEdge((y+h)/100*720,hTargets,TH); if(tb){ sy={t:tb}; h=tb.v/720*100-y; } }
       else if(mt){ var tt=snapEdge(y/100*720,hTargets,TH); if(tt){ sy={t:tt}; var ny=tt.v/720*100; h=h+(y-ny); y=ny; } }
+      // equal-size: snap the dimension to match a peer's width/height when an edge didn't align
+      if(!sx&&(mr||ml)){ var wc=w/100*1280; for(var i=0;i<snapBoxes.length;i++){ if(Math.abs(wc-snapBoxes[i].W)<=TH){ var nw=snapBoxes[i].W/1280*100; if(ml) x=x+(w-nw); w=nw; break; } } }
+      if(!sy&&(mt||mb)){ var hc=h/100*720; for(var j=0;j<snapBoxes.length;j++){ if(Math.abs(hc-snapBoxes[j].H)<=TH){ var nh=snapBoxes[j].H/720*100; if(mt) y=y+(h-nh); h=nh; break; } } }
     }
     if(w<MIN){ if(ml) x=startFrame.x+startFrame.w-MIN; w=MIN; }
     if(h<MIN){ if(mt) y=startFrame.y+startFrame.h-MIN; h=MIN; }
