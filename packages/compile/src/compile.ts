@@ -1,4 +1,4 @@
-import type { Deck, DeckNode, Theme } from "@deck/contract";
+import type { Deck, DeckNode, Frame, Theme } from "@deck/contract";
 
 /**
  * compileHtml is PURE and side-effect-free (load-bearing, decision #3): no I/O,
@@ -92,8 +92,25 @@ function layoutToCss(node: DeckNode): string {
   return out.join(";");
 }
 
+/** Canonical number format so compileHtml stays byte-identical (and quantizes to a grid). */
+function fmt(n: number): string {
+  return n.toFixed(3).replace(/\.?0+$/, "");
+}
+
+/** A framed node is taken out of flow and positioned absolutely on the slide (in %). */
+function frameToCss(f: Frame): string {
+  const out = [`position:absolute`, `left:${fmt(f.x)}%`, `top:${fmt(f.y)}%`];
+  if (f.w !== undefined) out.push(`width:${fmt(f.w)}%`);
+  if (f.h !== undefined) out.push(`height:${fmt(f.h)}%`);
+  if (f.rotation) out.push(`transform:rotate(${fmt(f.rotation)}deg)`);
+  if (f.z !== undefined) out.push(`z-index:${f.z}`);
+  return out.join(";");
+}
+
 function attrs(node: DeckNode): string {
-  const parts = [layoutToCss(node), styleToCss(node.style)];
+  const parts = [];
+  if (node.frame) parts.push(frameToCss(node.frame));
+  parts.push(layoutToCss(node), styleToCss(node.style));
   if (node.textAlign) parts.push(`text-align:${node.textAlign}`);
   const style = parts.filter(Boolean).join(";");
   const styleAttr = style ? ` style="${esc(style)}"` : "";

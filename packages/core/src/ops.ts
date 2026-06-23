@@ -1,6 +1,15 @@
 import { produce, current } from "immer";
 import { z } from "zod";
-import { NodeSchema, ContentSchema, TOKEN_REF, type Content, type Deck, type DeckNode } from "@deck/contract";
+import {
+  NodeSchema,
+  ContentSchema,
+  FrameSchema,
+  TOKEN_REF,
+  type Content,
+  type Deck,
+  type DeckNode,
+  type Frame,
+} from "@deck/contract";
 
 /**
  * Mutation layer. Ops address nodes by STABLE id (never by JSON Pointer / index),
@@ -18,6 +27,9 @@ export type Op =
   | { op: "set_content"; nodeId: string; content: Content }
   | { op: "set_token"; nodeId: string; prop: string; value: string }
   | { op: "set_align"; nodeId: string; value: "left" | "center" | "right" }
+  | { op: "set_frame"; nodeId: string; frame: Frame }
+  | { op: "remove_frame"; nodeId: string }
+  | { op: "move_to"; nodeId: string; x: number; y: number }
   | { op: "remove_token"; nodeId: string; prop: string }
   | { op: "insert_node"; parentId: string; index: number; node: DeckNode }
   | { op: "remove_node"; nodeId: string }
@@ -45,6 +57,9 @@ export const OpSchema: z.ZodType<Op> = z.discriminatedUnion("op", [
     })
     .strict(),
   z.object({ op: z.literal("set_align"), nodeId: idStr, value: z.enum(["left", "center", "right"]) }).strict(),
+  z.object({ op: z.literal("set_frame"), nodeId: idStr, frame: FrameSchema }).strict(),
+  z.object({ op: z.literal("remove_frame"), nodeId: idStr }).strict(),
+  z.object({ op: z.literal("move_to"), nodeId: idStr, x: z.number(), y: z.number() }).strict(),
   z.object({ op: z.literal("remove_token"), nodeId: idStr, prop: z.string().min(1) }).strict(),
   z
     .object({ op: z.literal("insert_node"), parentId: idStr, index: z.number().int(), node: NodeSchema })
@@ -154,6 +169,38 @@ export function apply(deck: Deck, ops: Op[]): ApplyResult {
           const old = node.textAlign ?? "left";
           node.textAlign = op.value;
           inverse.push({ op: "set_align", nodeId: op.nodeId, value: old });
+          break;
+        }
+        case "set_frame": {
+          const { node } = need(draft, op.nodeId);
+          const old = node.frame ? (current(node.frame) as Frame) : undefined;
+          node.frame = op.frame;
+          inverse.push(
+            old
+              ? { op: "set_frame", nodeId: op.nodeId, frame: old }
+              : { op: "remove_frame", nodeId: op.nodeId },
+          );
+          break;
+        }
+        case "remove_frame": {
+          const { node } = need(draft, op.nodeId);
+          if (node.frame) {
+            const old = current(node.frame) as Frame;
+            delete node.frame;
+            inverse.push({ op: "set_frame", nodeId: op.nodeId, frame: old });
+          }
+          break;
+        }
+        case "move_to": {
+          const { node } = need(draft, op.nodeId);
+          if (!node.frame) {
+            throw new Error(`move_to: node "${op.nodeId}" has no frame (set_frame first)`);
+          }
+          const oldX = node.frame.x;
+          const oldY = node.frame.y;
+          node.frame.x = op.x;
+          node.frame.y = op.y;
+          inverse.push({ op: "move_to", nodeId: op.nodeId, x: oldX, y: oldY });
           break;
         }
         case "set_token": {

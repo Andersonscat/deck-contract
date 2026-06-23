@@ -109,6 +109,30 @@ describe("inverse round-trip (free undo)", () => {
   });
 });
 
+describe("free positioning (frames)", () => {
+  it("set_frame adds a frame; inverse removes it back to flow", () => {
+    const deck = makeDeck();
+    const { deck: after, inverse } = apply(deck, [
+      { op: "set_frame", nodeId: "title_main", frame: { x: 10, y: 20, w: 30, h: 8 } },
+    ]);
+    expect(buildIndex(after).get("title_main")!.node.frame).toEqual({ x: 10, y: 20, w: 30, h: 8 });
+    const { deck: back } = apply(after, inverse);
+    expect(buildIndex(back).get("title_main")!.node.frame).toBeUndefined();
+    expect(JSON.stringify(back)).toBe(JSON.stringify(makeDeck()));
+  });
+
+  it("move_to requires a frame and patches x,y with inverse", () => {
+    const deck = makeDeck();
+    expect(() => apply(deck, [{ op: "move_to", nodeId: "title_main", x: 5, y: 5 }])).toThrow(/no frame/);
+
+    const { deck: framed } = apply(deck, [{ op: "set_frame", nodeId: "title_main", frame: { x: 1, y: 2 } }]);
+    const { deck: moved, inverse } = apply(framed, [{ op: "move_to", nodeId: "title_main", x: 40, y: 60 }]);
+    expect(buildIndex(moved).get("title_main")!.node.frame).toMatchObject({ x: 40, y: 60 });
+    const { deck: back } = apply(moved, inverse);
+    expect(buildIndex(back).get("title_main")!.node.frame).toMatchObject({ x: 1, y: 2 });
+  });
+});
+
 describe("test guard op", () => {
   it("passes when the value matches and blocks when it does not", () => {
     const deck = makeDeck();

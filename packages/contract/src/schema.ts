@@ -77,6 +77,26 @@ export const ContentSchema = z
   .strict();
 export type Content = z.infer<typeof ContentSchema>;
 
+/**
+ * Free positioning (Figma-style absolute escape hatch over flow). A node with a frame
+ * is taken out of the flex flow and placed absolutely on the slide. Coordinates are
+ * PERCENT of the canvas (0..100), origin = the slide's top-left — resolution-independent
+ * and easy to reason about (center = 50,50; off-canvas = x+w>100). w/h optional (omit =
+ * hug content). Geometry is raw numbers (unlike token-only color/font): the safety net
+ * for position is the renderer's OUT_OF_BOUNDS check, not the schema.
+ */
+export const FrameSchema = z
+  .object({
+    x: z.number(),
+    y: z.number(),
+    w: z.number().positive().optional(),
+    h: z.number().positive().optional(),
+    rotation: z.number().optional(),
+    z: z.number().int().optional(),
+  })
+  .strict();
+export type Frame = z.infer<typeof FrameSchema>;
+
 export interface DeckNode {
   id: string;
   type: string;
@@ -86,6 +106,7 @@ export interface DeckNode {
   layout?: z.infer<typeof LayoutSchema>;
   constraints?: z.infer<typeof ConstraintsSchema>;
   textAlign?: "left" | "center" | "right";
+  frame?: Frame;
   children?: DeckNode[];
 }
 
@@ -100,6 +121,7 @@ export const NodeSchema: z.ZodType<DeckNode> = z.lazy(() =>
       layout: LayoutSchema.optional(),
       constraints: ConstraintsSchema.optional(),
       textAlign: z.enum(["left", "center", "right"]).optional(),
+      frame: FrameSchema.optional(),
       children: z.array(NodeSchema).optional(),
     })
     .strict(),

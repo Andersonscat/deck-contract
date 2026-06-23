@@ -212,24 +212,39 @@ export const CLIENT_JS = `
     if(!el){ clearSel(); return; }
     e.preventDefault(); select(el);
   });
-  // hover frame + drag-to-move (reorder / reparent via move_node)
+  // hover frame + free drag (move by coordinates -> set_frame / move_to)
   var dragHover=null, candEl=null, downPt=null, dragging=false, dragNode=null, dragged=false;
+  var dragStart=null, dragSc=1, dragHasFrame=false;
   function hbox(){ if(!dragHover){ dragHover=document.createElement('div'); dragHover.id='dc-hover'; document.body.appendChild(dragHover); } return dragHover; }
-  function showBox(el,mode){ var h=hbox(); var r=el.getBoundingClientRect(); h.className=mode||''; h.style.display='block'; h.style.left=r.left+'px'; h.style.top=r.top+'px'; h.style.width=r.width+'px'; h.style.height=r.height+'px'; }
+  function showBox(el){ var h=hbox(); var r=el.getBoundingClientRect(); h.className=''; h.style.display='block'; h.style.left=r.left+'px'; h.style.top=r.top+'px'; h.style.width=r.width+'px'; h.style.height=r.height+'px'; }
   function hideBox(){ if(dragHover) dragHover.style.display='none'; }
-  function dirCid(parentEl){ var r=[]; for(var i=0;i<parentEl.children.length;i++){ var c=parentEl.children[i]; if(c.getAttribute&&c.getAttribute('data-cid')) r.push(c); } return r; }
-  function isCont(el){ return el.tagName==='SECTION' || dirCid(el).length>0; }
-  function pCid(el){ var p=el.parentElement; while(p){ if(p.getAttribute&&p.getAttribute('data-cid')&&p.closest('#dc-stage')) return p; p=p.parentElement; } return null; }
-  function dropAt(e){ var st=document.elementsFromPoint(e.clientX,e.clientY); for(var i=0;i<st.length;i++){ var c=st[i].closest?st[i].closest('#dc-stage [data-cid]'):null; if(c&&c!==dragNode&&!(dragNode&&dragNode.contains(c))) return c; } return null; }
-  stage.addEventListener('mousemove',function(e){ if(dragging){ var t=dropAt(e); if(t) showBox(t,'drop'); else hideBox(); return; } var el=e.target.closest('#dc-stage [data-cid]'); if(el) showBox(el,''); else hideBox(); });
+  function round3(n){ return Math.round(n*1000)/1000; }
+  stage.addEventListener('mousemove',function(e){ if(dragging) return; var el=e.target.closest('#dc-stage [data-cid]'); if(el&&el.getAttribute('data-type')!=='slide') showBox(el); else hideBox(); });
   stage.addEventListener('mouseleave',function(){ if(!dragging) hideBox(); });
-  stage.addEventListener('mousedown',function(e){ var el=e.target.closest('#dc-stage [data-cid]'); if(!el) return; if(el.getAttribute('data-type')==='slide') return; candEl=el; downPt={x:e.clientX,y:e.clientY}; dragged=false; });
-  document.addEventListener('mousemove',function(e){ if(!candEl||dragging) return; if(Math.abs(e.clientX-downPt.x)+Math.abs(e.clientY-downPt.y)>5){ dragging=true; dragNode=candEl; dragged=true; document.body.style.cursor='grabbing'; dragNode.style.opacity='0.5'; } });
-  document.addEventListener('mouseup',function(e){ if(dragging){ var tgt=dropAt(e); if(tgt) doMove(dragNode,tgt,e); if(dragNode) dragNode.style.opacity=''; dragging=false; document.body.style.cursor=''; hideBox(); } candEl=null; });
-  function doMove(node,tgt,e){ if(!node||!tgt||tgt===node||node.contains(tgt)) return; var parentEl,index;
-    if(isCont(tgt)){ parentEl=tgt; index=dirCid(parentEl).filter(function(x){ return x!==node; }).length; }
-    else { parentEl=pCid(tgt); if(!parentEl) return; var sibs=dirCid(parentEl).filter(function(x){ return x!==node; }); var ti=sibs.indexOf(tgt); if(ti<0) ti=sibs.length; var r=tgt.getBoundingClientRect(); var dir=getComputedStyle(parentEl).flexDirection; var before=(dir==='row')?(e.clientX<r.left+r.width/2):(e.clientY<r.top+r.height/2); index=before?ti:ti+1; }
-    op([{op:'move_node',nodeId:node.getAttribute('data-cid'),newParentId:parentEl.getAttribute('data-cid'),index:index}]); }
+  stage.addEventListener('mousedown',function(e){ var el=e.target.closest('#dc-stage [data-cid]'); if(!el||el.getAttribute('data-type')==='slide') return; candEl=el; downPt={x:e.clientX,y:e.clientY}; dragged=false; });
+  document.addEventListener('mousemove',function(e){
+    if(dragging){ dragNode.style.transform='translate('+(e.clientX-dragStart.mx)+'px,'+(e.clientY-dragStart.my)+'px)'; return; }
+    if(!candEl) return;
+    if(Math.abs(e.clientX-downPt.x)+Math.abs(e.clientY-downPt.y)>5) startDrag();
+  });
+  document.addEventListener('mouseup',function(e){ if(dragging) endDrag(e); candEl=null; });
+  function startDrag(){
+    dragging=true; dragNode=candEl; dragged=true; hideBox(); document.body.style.cursor='grabbing';
+    var fr=dragNode.closest('.dc-frame'); var frr=fr.getBoundingClientRect(); dragSc=frr.width/1280;
+    var er=dragNode.getBoundingClientRect();
+    dragHasFrame=(getComputedStyle(dragNode).position==='absolute');
+    dragStart={ x:(er.left-frr.left)/dragSc/1280*100, y:(er.top-frr.top)/dragSc/720*100, w:er.width/dragSc/1280*100, h:er.height/dragSc/720*100, mx:downPt.x, my:downPt.y };
+    dragNode.style.zIndex='6';
+  }
+  function endDrag(e){
+    var nx=round3(dragStart.x+(e.clientX-dragStart.mx)/dragSc/1280*100);
+    var ny=round3(dragStart.y+(e.clientY-dragStart.my)/dragSc/720*100);
+    var cid=dragNode.getAttribute('data-cid');
+    if(dragHasFrame) op([{op:'move_to',nodeId:cid,x:nx,y:ny}]);
+    else op([{op:'set_frame',nodeId:cid,frame:{x:nx,y:ny,w:round3(dragStart.w),h:round3(dragStart.h)}}]);
+    dragging=false; document.body.style.cursor='';
+    // transform stays until soft-refresh replaces the element at its new absolute position
+  }
   // close any open custom dropdown when clicking elsewhere
   document.addEventListener('click',function(e){ if(e.target.closest('.dc-dd')) return; var m=document.querySelectorAll('.dc-dd-menu.on'); for(var i=0;i<m.length;i++) m[i].classList.remove('on'); });
   document.addEventListener('dblclick',function(e){ var el=e.target.closest('#dc-stage [data-cid]'); if(!el) return; var type=el.getAttribute('data-type'); if(type!=='title'&&type!=='heading') return; e.preventDefault(); editText(el); });
@@ -257,7 +272,7 @@ export const CLIENT_JS = `
       var theme=document.getElementById('dc-theme'); if(theme&&typeof data.css==='string') theme.textContent=data.css;
       var prev=sel?sel.getAttribute('data-cid'):null;
       var editing=document.querySelector('#dc-stage [contenteditable="true"]');
-      if(editing) return; // don't clobber an in-progress text edit
+      if(editing||dragging) return; // don't clobber an in-progress text edit / drag
       for(var i=0;i<frames.length;i++){
         frames[i].innerHTML=data.slides[i].html;
         if(thumbs[i]) thumbs[i].innerHTML='<span class="dc-no">'+(i+1)+'</span>'+stripIds(data.slides[i].html);

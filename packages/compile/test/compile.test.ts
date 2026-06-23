@@ -44,6 +44,16 @@ describe("compileHtml", () => {
     expect(html).toContain("<figure");
   });
 
+  it("renders a framed node as absolute % position with canonical formatting", () => {
+    const deck = parseDeck(makeDeck());
+    deck.slides[0]!.children![0]!.children![0]!.frame = { x: 12.5, y: 50, w: 40 };
+    const { html } = compileHtml(deck);
+    expect(html).toContain("position:absolute");
+    expect(html).toContain("left:12.5%");
+    expect(html).toContain("top:50%");
+    expect(html).toContain("width:40%");
+  });
+
   it("escapes user content", () => {
     const deck = parseDeck(makeDeck());
     deck.slides[0]!.children![0]!.children![0]!.content!.text = "A & B <script>";
