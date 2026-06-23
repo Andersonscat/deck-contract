@@ -155,7 +155,7 @@ export const CLIENT_JS = `
     wrap.appendChild(trg); wrap.appendChild(menu); return wrap;
   }
   function alignSeg(cid,cur){ var seg=document.createElement('div'); seg.className='dc-seg'; ['left','center','right'].forEach(function(a){ var b=document.createElement('button'); b.type='button'; b.textContent=a.charAt(0).toUpperCase(); if(a===cur) b.className='on'; b.onclick=function(ev){ ev.stopPropagation(); op([{op:'set_align',nodeId:cid,value:a}]); }; seg.appendChild(b); }); return seg; }
-  function aiBtn(cid){ var b=document.createElement('button'); b.type='button'; b.className='dc-ai'; b.textContent='AI'; b.onclick=function(ev){ ev.stopPropagation(); post('/api/selection',{nodeId:cid}).then(function(){ flash('AI target = '+cid); }); }; return b; }
+  function insertBtn(label,blockId){ var b=document.createElement('button'); b.type='button'; b.className='dc-add'; b.textContent=label; b.onclick=function(ev){ ev.stopPropagation(); var pid=curSlideId(); if(!pid) return; post('/api/insert_block',{blockId:blockId,parentId:pid,index:999}).then(function(res){ if(res&&res.error) flash('error: '+res.error); else flash('added '+label); }); }; return b; }
 
   function select(el){
     clearSel(); el.classList.add('dc-selected'); sel=el;
@@ -170,7 +170,7 @@ export const CLIENT_JS = `
     if(sp.size){ var sizes=th.type||{}; var keys=Object.keys(sizes).sort(function(a,b){ return sizes[b]-sizes[a]; }); tool.appendChild(group('Size', makeDropdown({ value:tokenKey(st[sp.size]), items:keys.map(function(k){ return {v:k,label:''+sizes[k]}; }), onSelect:function(v){ op([{op:'set_token',nodeId:cid,prop:sp.size,value:'token://type/'+v}]); } }))); }
     if(sp.color){ var cols=th.color||{}; var ck=Object.keys(cols); tool.appendChild(group('Color', makeDropdown({ value:tokenKey(st[sp.color]), items:ck.map(function(k){ return {v:k,label:cap(k),swatch:cols[k]}; }), onSelect:function(v){ op([{op:'set_token',nodeId:cid,prop:sp.color,value:'token://color/'+v}]); } }))); }
     if(cf==='text'||cf==='items'){ tool.appendChild(alignSeg(cid,(node&&node.textAlign)||'left')); }
-    tool.appendChild(aiBtn(cid));
+    tool.appendChild(insertBtn('Text','heading'));
   }
 
   window.addEventListener('resize',function(){ fitAll(); updateCurrent(); });
