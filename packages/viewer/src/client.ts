@@ -47,7 +47,8 @@ export const CHROME_CSS = `
 #dc-stage{ flex:1; position:relative; overflow-y:auto; overflow-x:hidden; display:flex; flex-direction:column; align-items:center; gap:24px; padding:30px 0 60px; min-height:0; }
 .dc-frame{ display:block; flex:none; border:1px solid #aeb3bd; background:#000; }
 .dc-frame > section{ transform-origin:top left; }
-[data-cid]{ cursor:pointer; }
+#dc-stage [data-cid]{ cursor:grab; }
+#dc-stage section[data-cid]{ cursor:default; }
 .dc-selected{ outline:2px solid #ec5a13 !important; outline-offset:-2px; }
 #dc-hover{ position:fixed; pointer-events:none; z-index:35; display:none; border:2px solid rgba(74,108,247,.55); border-radius:3px; }
 #dc-hover.drop{ border-color:#ec5a13; background:rgba(236,90,19,.08); }
@@ -173,7 +174,7 @@ export const CLIENT_JS = `
   // Apply edits optimistically to the live DOM so style/position changes are instant and the
   // slide doesn't have to be rebuilt (which flashes + drops the selection). Returns true only
   // if EVERY op was something we can render locally; structural ops fall back to a rebuild.
-  var opInFlight=0;
+  var opInFlight=0, opSeq=0;
   var CSS_PROP={ color:'color', font:'font-family', size:'font-size', marker:'--marker-color', valueColor:'color', valueFont:'font-family', valueSize:'font-size', labelColor:'--label-color', labelSize:'--label-size', captionColor:'--caption-color', captionSize:'--caption-size', radius:'border-radius', background:'background' };
   function tokenToVarJS(ref){ var m=/^token:\\/\\/([a-z][a-z0-9]*)\\/([A-Za-z0-9][A-Za-z0-9-]*)$/.exec(ref); return m?'var(--'+m[1]+'-'+m[2]+')':ref; }
   function applyOptimistic(ops){
@@ -196,7 +197,7 @@ export const CLIENT_JS = `
     refreshHist();
   }
   function op(ops){
-    var optimistic=applyOptimistic(ops); opInFlight++;
+    var optimistic=applyOptimistic(ops); opInFlight++; opSeq++;
     return post('/api/op',{ops:ops}).then(function(res){ opInFlight--;
       if(res&&res.error){ flash('error: '+res.error); forceRebuild(); return; }
       if(res){ setHist(res); if(res.slides) applySlides(res.slides,!optimistic); }
@@ -392,7 +393,7 @@ export const CLIENT_JS = `
     drawGuides(dragNode,s);
   }
   function startDrag(e){
-    dragging=true; dragNode=candEl; dragged=true; dragLast=null; hideBox(); hideHandles(); document.body.style.cursor='grabbing';
+    dragging=true; dragNode=candEl; dragged=true; dragLast=null; heldX=null; heldY=null; hideBox(); hideHandles(); document.body.style.cursor='grabbing';
     document.body.style.userSelect='none'; var sg=window.getSelection&&window.getSelection(); if(sg&&sg.removeAllRanges) sg.removeAllRanges();
     var fr=dragNode.closest('section'); var frr=fr.getBoundingClientRect(); dragSc=frr.width/1280;
     var er=dragNode.getBoundingClientRect();
@@ -407,7 +408,7 @@ export const CLIENT_JS = `
   // (1280x720); the threshold is a screen-px value / scale so the magnet feels the same at
   // any zoom. Each target carries a cross-axis extent [lo,hi] so its guide line spans only
   // the involved boxes, not the whole slide. Slide/centre targets come first -> they win ties.
-  var vTargets=[], hTargets=[], snapBoxes=[], guidesEl=null, distEl=null;
+  var vTargets=[], hTargets=[], snapBoxes=[], guidesEl=null, distEl=null, heldX=null, heldY=null;
   function buildTargets(activeEl,sec,scl){
     var secr=sec.getBoundingClientRect();
     var vT=[{v:640,lo:0,hi:720},{v:0,lo:0,hi:720},{v:1280,lo:0,hi:720}];
@@ -423,6 +424,12 @@ export const CLIENT_JS = `
     return { vT:vT, hT:hT, boxes:boxes };
   }
   function snapAxis(cands,targets,TH){ var best=null; for(var i=0;i<cands.length;i++){ for(var j=0;j<targets.length;j++){ var d=targets[j].v-cands[i]; if(Math.abs(d)<=TH&&(!best||Math.abs(d)<Math.abs(best.delta))) best={delta:d,t:targets[j]}; } } return best; }
+  // Hysteresis: once snapped to a target, keep it until the box moves past a wider exit band,
+  // so the line doesn't flicker / fight the cursor at the threshold boundary.
+  function snapAxisH(cands,targets,TH,TO,held){
+    if(held){ var keep=null; for(var i=0;i<cands.length;i++){ var d=held.v-cands[i]; if(Math.abs(d)<=TO&&(!keep||Math.abs(d)<Math.abs(keep.delta))) keep={delta:d,t:held}; } if(keep) return keep; }
+    return snapAxis(cands,targets,TH);
+  }
   function snapEdge(c,targets,TH){ var best=null; for(var j=0;j<targets.length;j++){ var d=Math.abs(targets[j].v-c); if(d<=TH&&(!best||d<best.d)) best={d:d,t:targets[j]}; } return best?best.t:null; }
   // Phase 3c distribution: snap so the dragged box sits with EQUAL gaps between its nearest
   // left/right (or top/bottom) neighbour on the same row/column. Returns the snapped position
@@ -450,11 +457,14 @@ export const CLIENT_JS = `
     var L=dragStart.x/100*1280+(e.clientX-dragStart.mx)/dragSc;
     var T=dragStart.y/100*720+(e.clientY-dragStart.my)/dragSc;
     var sx=null, sy=null, dist={x:null,y:null};
-    if(!e.altKey){ var TH=6/dragSc;
+    if(!e.altKey){ var TH=6/dragSc, TO=10/dragSc;
+      // edge/centre alignment wins (with hysteresis); distribution only fills an axis that didn't align
+      sx=snapAxisH([L,L+W/2,L+W],vTargets,TH,TO,heldX); heldX=sx?sx.t:null; if(sx) L+=sx.delta;
+      sy=snapAxisH([T,T+H/2,T+H],hTargets,TH,TO,heldY); heldY=sy?sy.t:null; if(sy) T+=sy.delta;
       dist=distributeSnap(L,T,W,H,TH);
-      if(dist.x){ L=dist.x.L; } else { sx=snapAxis([L,L+W/2,L+W],vTargets,TH); if(sx) L+=sx.delta; }
-      if(dist.y){ T=dist.y.T; } else { sy=snapAxis([T,T+H/2,T+H],hTargets,TH); if(sy) T+=sy.delta; }
-    }
+      if(!sx&&dist.x){ L=dist.x.L; } else dist.x=null;
+      if(!sy&&dist.y){ T=dist.y.T; } else dist.y=null;
+    } else { heldX=null; heldY=null; }
     return { L:L, T:T, W:W, H:H, sx:sx, sy:sy, dist:dist };
   }
   function gbox(){ if(!guidesEl){ var c=document.createElement('div'); c.id='dc-guides'; var v=document.createElement('div'); v.className='dc-guide v'; var h=document.createElement('div'); h.className='dc-guide h'; c.appendChild(v); c.appendChild(h); document.body.appendChild(c); guidesEl={v:v,h:h}; } return guidesEl; }
@@ -610,7 +620,9 @@ export const CLIENT_JS = `
   function stripIds(h){ return h.replace(/ data-cid="[^"]*"/g,'').replace(/ data-type="[^"]*"/g,'').replace(/ data-role="[^"]*"/g,''); }
   var lastSlideHtml=[];
   function softRefresh(){
+    var seq0=opSeq; // if any of our own ops start during this fetch, its (possibly stale, fs.watch-delayed) result is void
     fetch('/api/slides').then(function(r){ return r.json(); }).then(function(data){
+      if(opSeq!==seq0) return; // a local op straddled this fetch -> its response already reconciled the cache
       if(!data.slides || data.slides.length!==frames.length){ location.reload(); return; }
       var theme=document.getElementById('dc-theme'); if(theme&&typeof data.css==='string') theme.textContent=data.css;
       var prev=sel?sel.getAttribute('data-cid'):null;
