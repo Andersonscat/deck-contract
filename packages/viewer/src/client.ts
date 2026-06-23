@@ -157,7 +157,25 @@ export const CLIENT_JS = `
     post('/api/chat',{message:msg,currentSlideId:curSlideId(),selectedId:selId}).then(function(res){ pending.remove(); addMsg('ai',res.reply||'(no reply)'); if(res.applied){ flash('applied '+res.applied+' edit(s)'); } }).catch(function(err){ pending.remove(); addMsg('sys','error: '+err); });
   });
 
-  try{ var es=new EventSource('/api/events'); es.onmessage=function(){ location.reload(); }; }catch(e){}
+  // Soft re-render: patch the slide DOM in place instead of reloading the page, so
+  // scroll position, the selection, the open panel, and the chat history all survive.
+  function stripIds(h){ return h.replace(/ data-cid="[^"]*"/g,'').replace(/ data-type="[^"]*"/g,'').replace(/ data-role="[^"]*"/g,''); }
+  function softRefresh(){
+    fetch('/api/slides').then(function(r){ return r.json(); }).then(function(data){
+      if(!data.slides || data.slides.length!==frames.length){ location.reload(); return; }
+      var theme=document.getElementById('dc-theme'); if(theme&&typeof data.css==='string') theme.textContent=data.css;
+      var prev=sel?sel.getAttribute('data-cid'):null;
+      var editing=document.querySelector('#dc-stage [contenteditable="true"]');
+      if(editing) return; // don't clobber an in-progress text edit
+      for(var i=0;i<frames.length;i++){
+        frames[i].innerHTML=data.slides[i].html;
+        if(thumbs[i]) thumbs[i].innerHTML='<span class="dc-no">'+(i+1)+'</span>'+stripIds(data.slides[i].html);
+      }
+      fitAll(); sel=null; tool.style.display='none';
+      if(prev){ var again=document.querySelector('#dc-stage [data-cid="'+prev+'"]'); if(again) select(again); }
+    }).catch(function(){ location.reload(); });
+  }
+  try{ var es=new EventSource('/api/events'); es.onmessage=function(){ softRefresh(); }; }catch(e){}
   setTab(sessionStorage.getItem('dc-tab')||'slides');
   fitAll();
   var saved=parseInt(sessionStorage.getItem('dc-cur')||'0',10); if(saved>0&&frames[saved]) frames[saved].scrollIntoView({block:'center'});

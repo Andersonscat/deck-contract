@@ -109,8 +109,8 @@ export function createViewerServer(opts: ViewerOptions) {
       .join("");
 
     return (
-      '<!doctype html><html lang="ru"><head><meta charset="utf-8"/><title>deck-contract</title><style>' +
-      css + "\n" + CHROME_CSS + "</style></head><body class=\"dc-app\">" +
+      '<!doctype html><html lang="ru"><head><meta charset="utf-8"/><title>deck-contract</title>' +
+      '<style id="dc-theme">' + css + "</style><style>" + CHROME_CSS + "</style></head><body class=\"dc-app\">" +
       '<div id="dc-left"><div class="dc-rail">' +
       '<button class="dc-tab dc-act" data-tab="slides"><span class="dc-ico">▤</span>Слайды</button>' +
       '<button class="dc-tab" data-tab="elements"><span class="dc-ico">◆</span>Элементы</button>' +
@@ -148,6 +148,10 @@ export function createViewerServer(opts: ViewerOptions) {
         return;
       }
       if (req.method === "GET" && url === "/api/deck") return json(await readDeck());
+      if (req.method === "GET" && url === "/api/slides") {
+        const { css, slides } = compileSlides(await readDeck());
+        return json({ css, slides });
+      }
       if (req.method === "GET" && url === "/api/events") {
         res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
         res.write("\n");
