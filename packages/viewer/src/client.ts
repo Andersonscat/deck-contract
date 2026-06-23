@@ -124,7 +124,7 @@ export const CLIENT_JS = `
   var TOOL_EMPTY='Select an element to edit it';
   function setHead(t){ var h=document.getElementById('dc-chat-head'); if(h) h.textContent=t; }
   function deleteNode(cid){ post('/api/op',{ops:[{op:'remove_node',nodeId:cid}]}).then(function(res){ if(res&&res.error) flash('error: '+res.error); else flash('deleted'); }); }
-  function clearSel(){ var n=document.querySelectorAll('.dc-selected'); for(var i=0;i<n.length;i++) n[i].classList.remove('dc-selected'); sel=null; setHead('AI assistant'); buildDefaultTool(); hideHandles(); }
+  function clearSel(){ var n=document.querySelectorAll('.dc-selected'); for(var i=0;i<n.length;i++) n[i].classList.remove('dc-selected'); sel=null; setHead('AI assistant'); buildDefaultTool(); hideHandles(); restoreElements(); }
   // when nothing is selected the top bar still shows useful content (insert actions)
   function buildDefaultTool(){
     if(!tool) return;
@@ -172,6 +172,7 @@ export const CLIENT_JS = `
     clearSel(); el.classList.add('dc-selected'); sel=el;
     var cid=el.getAttribute('data-cid'); var type=el.getAttribute('data-type');
     setHead('AI · selected: '+type);
+    if(VARIANTS[type]){ setTab('elements'); showVariants(type); }
     positionHandles();
     fetch('/api/node?id='+encodeURIComponent(cid)).then(function(r){ return r.json(); }).then(function(node){ if(sel!==el) return; buildTool(cid,type,(node&&node.id)?node:null); }).catch(function(){ if(sel===el) buildTool(cid,type,null); });
   }
@@ -208,11 +209,40 @@ export const CLIENT_JS = `
   }
   for(var i=0;i<tabs.length;i++){ (function(tb){ tb.onclick=function(){ setTab(tb.getAttribute('data-tab')); }; })(tabs[i]); }
 
-  // insert blocks (Elements / Text) into the current slide
-  var blockBtns=[].slice.call(document.querySelectorAll('[data-block]'));
-  for(var b=0;b<blockBtns.length;b++){ (function(btn){ btn.onclick=function(){ var bid=btn.getAttribute('data-block'); var pid=curSlideId(); if(!pid) return;
-    post('/api/insert_block',{blockId:bid,parentId:pid,index:999}).then(function(res){ if(res&&res.error) flash('error: '+res.error); else flash('added '+bid); });
-  }; })(blockBtns[b]); }
+  // Elements panel: insert blocks by default; style variants of the selected element on selection
+  var elementsPanel=document.querySelector('.dc-panel2[data-panel="elements"]');
+  var elementsDefaultHTML=elementsPanel?elementsPanel.innerHTML:'';
+  function wireInsertButtons(){
+    var bb=[].slice.call(document.querySelectorAll('[data-block]'));
+    for(var b=0;b<bb.length;b++){ (function(btn){ btn.onclick=function(){ var bid=btn.getAttribute('data-block'); var pid=curSlideId(); if(!pid) return;
+      post('/api/insert_block',{blockId:bid,parentId:pid,index:999}).then(function(res){ if(res&&res.error) flash('error: '+res.error); else flash('added '+bid); });
+    }; })(bb[b]); }
+  }
+  wireInsertButtons();
+  function restoreElements(){ if(elementsPanel){ elementsPanel.innerHTML=elementsDefaultHTML; wireInsertButtons(); } }
+  var VARIANTS={
+    title:[ {label:'White',ops:{color:'text',size:'h1'}}, {label:'Accent',ops:{color:'accent',size:'h1'}}, {label:'Display',ops:{color:'text',size:'display'}}, {label:'Muted',ops:{color:'muted',size:'h2'}} ],
+    heading:[ {label:'White',ops:{color:'text',size:'h2'}}, {label:'Accent',ops:{color:'accent',size:'h2'}}, {label:'Big',ops:{color:'text',size:'h1'}}, {label:'Muted',ops:{color:'muted',size:'body'}} ],
+    'bullet-list':[ {label:'Accent dots',ops:{marker:'accent',color:'text',size:'body'}}, {label:'Muted',ops:{marker:'muted',color:'muted',size:'body'}}, {label:'Large',ops:{marker:'accent',color:'text',size:'h2'}} ],
+    'stat-callout':[ {label:'Accent',ops:{valueColor:'accent',valueSize:'h1'}}, {label:'Big',ops:{valueColor:'accent',valueSize:'display'}}, {label:'White',ops:{valueColor:'text',valueSize:'h1'}}, {label:'Muted',ops:{valueColor:'muted',valueSize:'h2'}} ],
+    'image-caption':[ {label:'Caption muted',ops:{captionColor:'muted',captionSize:'caption'}}, {label:'Caption accent',ops:{captionColor:'accent',captionSize:'caption'}} ]
+  };
+  function propNs(p){ if(p==='size'||p.indexOf('Size')>=0) return 'type'; if(p==='font'||p.indexOf('Font')>=0) return 'font'; if(p==='radius') return 'radius'; return 'color'; }
+  function variantPreview(type,v){
+    var c='var(--color-'+(v.ops.color||v.ops.valueColor||v.ops.marker||v.ops.captionColor||'text')+')';
+    if(type==='stat-callout') return '<div style="font:800 24px/1 sans-serif;color:'+c+'">3x</div><div style="font-size:10px;color:var(--color-muted)">metric</div>';
+    if(type==='bullet-list'){ var dot='<span style="width:5px;height:5px;border-radius:50%;background:var(--color-'+(v.ops.marker||'accent')+');display:inline-block;margin-right:6px"></span>'; var ln='<div style="display:flex;align-items:center;margin:3px 0">'+dot+'<span style="height:5px;width:74px;background:#5a6172;border-radius:3px"></span></div>'; return ln+ln+ln; }
+    if(type==='image-caption') return '<div style="width:100%;height:42px;background:#3a4150;border-radius:6px"></div><div style="font-size:10px;margin-top:5px;color:'+c+'">caption</div>';
+    return '<div style="font:800 22px/1 sans-serif;color:'+c+'">Aa</div>';
+  }
+  function showVariants(type){
+    if(!elementsPanel) return; var vs=VARIANTS[type]; if(!vs){ restoreElements(); return; }
+    var html='<h4>'+cap(type)+' styles</h4><div class="dc-grid">';
+    for(var i=0;i<vs.length;i++){ html+='<button class="dc-el" data-variant="'+i+'"><div class="dc-prev">'+variantPreview(type,vs[i])+'</div><span class="dc-lbl">'+vs[i].label+'</span></button>'; }
+    elementsPanel.innerHTML=html+'</div>';
+    var cards=[].slice.call(elementsPanel.querySelectorAll('[data-variant]'));
+    for(var k=0;k<cards.length;k++){ (function(card){ card.onclick=function(){ if(!sel) return; var v=vs[parseInt(card.getAttribute('data-variant'),10)]; var keys=Object.keys(v.ops); if(!keys.length) return; op(keys.map(function(prop){ return {op:'set_token',nodeId:sel.getAttribute('data-cid'),prop:prop,value:'token://'+propNs(prop)+'/'+v.ops[prop]}; })); }; })(cards[k]); }
+  }
 
   // brand swatches recolor the selected element
   var sw=[].slice.call(document.querySelectorAll('.dc-swatch'));
