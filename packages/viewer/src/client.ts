@@ -97,10 +97,10 @@ export const CLIENT_JS = `
     clearSel(); el.classList.add('dc-selected'); sel=el;
     var cid=el.getAttribute('data-cid'); var type=el.getAttribute('data-type'); var editable=(type==='title'||type==='heading');
     setHead('AI · selected: ' + type);
-    tool.innerHTML=(editable?'<button data-act="edit" title="edit text">✎</button>':'')+
-      '<button data-act="ai" title="AI target">AI</button>'+
-      '<button data-act="copy" title="copy id">⧉</button>'+
-      '<button data-act="delete" title="delete">🗑</button>';
+    tool.innerHTML=(editable?'<button data-act="edit" title="edit text">Edit</button>':'')+
+      '<button data-act="ai" title="set as AI target">AI</button>'+
+      '<button data-act="copy" title="copy id">Copy</button>'+
+      '<button data-act="delete" title="delete">Delete</button>';
     tool.querySelectorAll('button').forEach(function(btn){ btn.onclick=function(ev){ ev.stopPropagation();
       var a=btn.getAttribute('data-act');
       if(a==='edit') editText(el);
@@ -119,7 +119,7 @@ export const CLIENT_JS = `
     if(e.target&&e.target.id==='dc-chat-input') return;
     if(e.key==='ArrowDown'){ e.preventDefault(); goTo(Math.min(cur+1,frames.length-1)); }
     if(e.key==='ArrowUp'){ e.preventDefault(); goTo(Math.max(cur-1,0)); }
-    if(e.key==='Delete'&&sel){ e.preventDefault(); deleteNode(sel.getAttribute('data-cid')); }
+    if((e.key==='Delete'||e.key==='Backspace')&&sel){ e.preventDefault(); deleteNode(sel.getAttribute('data-cid')); }
   });
 
   // left rail tabs
