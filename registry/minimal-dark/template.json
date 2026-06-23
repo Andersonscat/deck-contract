@@ -32,6 +32,20 @@
       "role": "visual",
       "content": { "src": "asset://images/placeholder.png", "alt": "image", "caption": "Caption" },
       "style": { "radius": "token://radius/md", "captionColor": "token://color/muted", "captionSize": "token://type/caption" }
+    },
+    "heading": {
+      "id": "block_heading",
+      "type": "heading",
+      "role": "heading",
+      "content": { "text": "New heading" },
+      "style": { "color": "token://color/text", "font": "token://font/heading", "size": "token://type/h1" }
+    },
+    "subtitle": {
+      "id": "block_subtitle",
+      "type": "heading",
+      "role": "subtitle",
+      "content": { "text": "New subtitle" },
+      "style": { "color": "token://color/muted", "font": "token://font/body", "size": "token://type/h2" }
     }
   }
 }

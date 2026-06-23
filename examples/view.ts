@@ -25,8 +25,9 @@ const selectionDir = join(homedir(), ".deck-contract");
 mkdirSync(selectionDir, { recursive: true });
 const selectionPath = join(selectionDir, "selection.json");
 
+const blocksPath = join(repoRoot, "registry", "minimal-dark", "template.json");
 const port0 = Number(process.env.DECK_VIEWER_PORT ?? 4570);
-const viewer = createViewerServer({ deckPath, selectionPath, port: port0 });
+const viewer = createViewerServer({ deckPath, selectionPath, blocksPath, port: port0 });
 const port = await viewer.listen();
 console.log(`viewer:    http://localhost:${port}`);
 console.log(`deck file: ${deckPath}`);
