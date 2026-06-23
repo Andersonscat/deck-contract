@@ -102,7 +102,8 @@ export function createViewerServer(opts: ViewerOptions) {
     const thumbs = slides
       .map(
         (s, i) =>
-          '<button class="dc-slidethumb' + (i === 0 ? " dc-cur" : "") + '" data-idx="' + i + '">' +
+          '<button class="dc-slidethumb' + (i === 0 ? " dc-cur" : "") + '" draggable="true" data-idx="' + i +
+          '" data-sid="' + s.id + '">' +
           '<span class="dc-no">' + (i + 1) + "</span>" + strip(s.html) + "</button>",
       )
       .join("");
@@ -130,7 +131,8 @@ export function createViewerServer(opts: ViewerOptions) {
       '<button class="dc-tab" data-tab="text"><span class="dc-ico">T</span>Text</button>' +
       '<button class="dc-tab" data-tab="brand"><span class="dc-ico">✦</span>Brand</button>' +
       '</div><div class="dc-panels">' +
-      '<div class="dc-panel2 dc-on" data-panel="slides"><h4>Slides</h4>' + thumbs + "</div>" +
+      '<div class="dc-panel2 dc-on" data-panel="slides"><h4>Slides</h4><div id="dc-thumbs">' + thumbs +
+      '</div><button id="dc-add-slide"><span>+</span> New slide</button></div>' +
       '<div class="dc-panel2" data-panel="elements"><h4>Elements</h4>' + elGrid(ELEMENT_BLOCKS) + "</div>" +
       '<div class="dc-panel2" data-panel="text"><h4>Text</h4>' + elGrid(TEXT_BLOCKS) + "</div>" +
       '<div class="dc-panel2" data-panel="brand"><h4>Theme colors</h4><div class="dc-swatches">' + swatches + "</div></div>" +
@@ -194,6 +196,32 @@ export function createViewerServer(opts: ViewerOptions) {
           // SSE round-trip rebuilding (and flashing) the slide it already updated optimistically.
           const { slides } = compileSlides(await readDeck());
           return json({ ok: true, ...hist(), slides });
+        } catch (e) {
+          return json({ error: e instanceof Error ? e.message : String(e) });
+        }
+      }
+      if (req.method === "POST" && url === "/api/add_slide") {
+        try {
+          const deck = await readDeck();
+          // Reuse the deck's own layout + a real title style so the new slide is on-theme.
+          const findType = (n: DeckNode, t: string): DeckNode | null => {
+            if (n.type === t) return n;
+            for (const c of n.children ?? []) { const r = findType(c, t); if (r) return r; }
+            return null;
+          };
+          let titleStyle: Record<string, string> = {};
+          for (const s of deck.slides) { const t = findType(s, "title"); if (t?.style) { titleStyle = t.style; break; } }
+          const first = deck.slides[0];
+          const tmpl = {
+            id: "slide_blank", type: "slide",
+            layout: first?.layout ?? { direction: "column", padding: "token://space/xl", justify: "center" },
+            style: first?.style ?? {},
+            children: [{ id: "blank_title", type: "title", content: { text: "New slide" }, style: titleStyle }],
+          } as unknown as DeckNode;
+          const { node } = cloneWithNewIds(tmpl);
+          await commit([{ op: "insert_node", parentId: "@slides", index: deck.slides.length, node }]);
+          const { slides } = compileSlides(await readDeck());
+          return json({ ok: true, ...hist(), slides, newId: node.id });
         } catch (e) {
           return json({ error: e instanceof Error ? e.message : String(e) });
         }
