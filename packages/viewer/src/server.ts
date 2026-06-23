@@ -135,8 +135,8 @@ export function createViewerServer(opts: ViewerOptions) {
       "</div><script>window.DC_THEME=" +
       JSON.stringify({
         font: Object.keys(deck.theme.font),
-        type: Object.keys(deck.theme.type),
-        color: Object.keys(deck.theme.color),
+        type: Object.fromEntries(Object.entries(deck.theme.type).map(([k, v]) => [k, parseInt(v, 10) || v])),
+        color: deck.theme.color,
       }) +
       ";</script><script>" + CLIENT_JS + "</script></body></html>"
     );
