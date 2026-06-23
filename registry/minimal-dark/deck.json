@@ -8,29 +8,79 @@
       "surface": "#171a21",
       "text": "#f5f6f8",
       "muted": "#9aa3b2",
-      "accent": "#ec5a13"
+      "accent": "#ec5a13",
+      "white": "#ffffff",
+      "black": "#0b0d10",
+      "slate": "#64748b",
+      "gray": "#9ca3af",
+      "red": "#ef4444",
+      "orange": "#f97316",
+      "amber": "#f59e0b",
+      "yellow": "#eab308",
+      "green": "#22c55e",
+      "emerald": "#10b981",
+      "teal": "#14b8a6",
+      "sky": "#0ea5e9",
+      "blue": "#3b82f6",
+      "indigo": "#6366f1",
+      "violet": "#8b5cf6",
+      "purple": "#a855f7",
+      "pink": "#ec4899",
+      "rose": "#f43f5e"
     },
     "font": {
       "heading": "Inter, system-ui, sans-serif",
-      "body": "Inter, system-ui, sans-serif"
+      "body": "Inter, system-ui, sans-serif",
+      "inter": "'Inter',system-ui,sans-serif",
+      "roboto": "'Roboto',sans-serif",
+      "poppins": "'Poppins',sans-serif",
+      "montserrat": "'Montserrat',sans-serif",
+      "dmsans": "'DM Sans',sans-serif",
+      "spacegrotesk": "'Space Grotesk',sans-serif",
+      "playfair": "'Playfair Display',Georgia,serif",
+      "lora": "'Lora',Georgia,serif",
+      "merriweather": "'Merriweather',Georgia,serif",
+      "oswald": "'Oswald',sans-serif"
     },
     "type": {
       "display": "72px",
       "h1": "40px",
       "h2": "26px",
       "body": "18px",
-      "caption": "14px"
+      "caption": "14px",
+      "s12": "12px",
+      "s16": "16px",
+      "s22": "22px",
+      "s32": "32px",
+      "s48": "48px",
+      "s56": "56px",
+      "s64": "64px",
+      "s88": "88px",
+      "s96": "96px"
     },
-    "space": { "xs": "6px", "sm": "10px", "md": "18px", "lg": "28px", "xl": "56px" },
-    "radius": { "md": "14px" }
+    "space": {
+      "xs": "6px",
+      "sm": "10px",
+      "md": "18px",
+      "lg": "28px",
+      "xl": "56px"
+    },
+    "radius": {
+      "md": "14px"
+    }
   },
-  "canvas": { "width": 1280, "height": 720 },
+  "canvas": {
+    "width": 1280,
+    "height": 720
+  },
   "slides": [
     {
       "id": "slide_title",
       "type": "slide",
       "role": "title",
-      "style": { "background": "token://color/bg" },
+      "style": {
+        "background": "token://color/bg"
+      },
       "layout": {
         "direction": "column",
         "gap": "token://space/md",
@@ -43,16 +93,31 @@
           "id": "title_hero",
           "type": "title",
           "role": "slide-title",
-          "content": { "text": "Acme — AI-native infrastructure" },
-          "style": { "color": "token://color/text", "font": "token://font/heading", "size": "token://type/display" },
-          "constraints": { "maxChars": 48, "overflow": "shrink-to-fit" }
+          "content": {
+            "text": "Acme — AI-native infrastructure"
+          },
+          "style": {
+            "color": "token://color/text",
+            "font": "token://font/heading",
+            "size": "token://type/display"
+          },
+          "constraints": {
+            "maxChars": 48,
+            "overflow": "shrink-to-fit"
+          }
         },
         {
           "id": "title_sub",
           "type": "heading",
           "role": "subtitle",
-          "content": { "text": "Seed deck · 2026" },
-          "style": { "color": "token://color/muted", "font": "token://font/body", "size": "token://type/h2" }
+          "content": {
+            "text": "Seed deck · 2026"
+          },
+          "style": {
+            "color": "token://color/muted",
+            "font": "token://font/body",
+            "size": "token://type/h2"
+          }
         }
       ]
     },
@@ -60,37 +125,81 @@
       "id": "slide_metrics",
       "type": "slide",
       "role": "content",
-      "style": { "background": "token://color/bg" },
-      "layout": { "direction": "column", "gap": "token://space/lg", "padding": "token://space/xl" },
+      "style": {
+        "background": "token://color/bg"
+      },
+      "layout": {
+        "direction": "column",
+        "gap": "token://space/lg",
+        "padding": "token://space/xl"
+      },
       "children": [
         {
           "id": "metrics_title",
           "type": "title",
-          "content": { "text": "Traction" },
-          "style": { "color": "token://color/text", "font": "token://font/heading", "size": "token://type/h1" }
+          "content": {
+            "text": "Traction"
+          },
+          "style": {
+            "color": "token://color/text",
+            "font": "token://font/heading",
+            "size": "token://type/h1"
+          }
         },
         {
           "id": "metrics_row",
           "type": "container",
-          "layout": { "direction": "row", "gap": "token://space/lg", "align": "start" },
+          "layout": {
+            "direction": "row",
+            "gap": "token://space/lg",
+            "align": "start"
+          },
           "children": [
             {
               "id": "metric_arr",
               "type": "stat-callout",
-              "content": { "value": "$1.2M", "label": "ARR", "delta": "+204%" },
-              "style": { "valueColor": "token://color/accent", "valueFont": "token://font/heading", "valueSize": "token://type/h1", "labelColor": "token://color/muted", "labelSize": "token://type/caption" }
+              "content": {
+                "value": "$1.2M",
+                "label": "ARR",
+                "delta": "+204%"
+              },
+              "style": {
+                "valueColor": "token://color/accent",
+                "valueFont": "token://font/heading",
+                "valueSize": "token://type/h1",
+                "labelColor": "token://color/muted",
+                "labelSize": "token://type/caption"
+              }
             },
             {
               "id": "metric_ret",
               "type": "stat-callout",
-              "content": { "value": "92%", "label": "Net retention" },
-              "style": { "valueColor": "token://color/accent", "valueFont": "token://font/heading", "valueSize": "token://type/h1", "labelColor": "token://color/muted", "labelSize": "token://type/caption" }
+              "content": {
+                "value": "92%",
+                "label": "Net retention"
+              },
+              "style": {
+                "valueColor": "token://color/accent",
+                "valueFont": "token://font/heading",
+                "valueSize": "token://type/h1",
+                "labelColor": "token://color/muted",
+                "labelSize": "token://type/caption"
+              }
             },
             {
               "id": "metric_logos",
               "type": "stat-callout",
-              "content": { "value": "2", "label": "Enterprise logos" },
-              "style": { "valueColor": "token://color/accent", "valueFont": "token://font/heading", "valueSize": "token://type/h1", "labelColor": "token://color/muted", "labelSize": "token://type/caption" }
+              "content": {
+                "value": "2",
+                "label": "Enterprise logos"
+              },
+              "style": {
+                "valueColor": "token://color/accent",
+                "valueFont": "token://font/heading",
+                "valueSize": "token://type/h1",
+                "labelColor": "token://color/muted",
+                "labelSize": "token://type/caption"
+              }
             }
           ]
         }
@@ -100,34 +209,75 @@
       "id": "slide_why",
       "type": "slide",
       "role": "content",
-      "style": { "background": "token://color/bg" },
-      "layout": { "direction": "row", "gap": "token://space/xl", "padding": "token://space/xl" },
+      "style": {
+        "background": "token://color/bg"
+      },
+      "layout": {
+        "direction": "row",
+        "gap": "token://space/xl",
+        "padding": "token://space/xl"
+      },
       "children": [
         {
           "id": "why_col",
           "type": "container",
-          "layout": { "direction": "column", "gap": "token://space/md", "sizing": { "width": "fill" } },
+          "layout": {
+            "direction": "column",
+            "gap": "token://space/md",
+            "sizing": {
+              "width": "fill"
+            }
+          },
           "children": [
             {
               "id": "why_title",
               "type": "title",
-              "content": { "text": "Why now" },
-              "style": { "color": "token://color/text", "font": "token://font/heading", "size": "token://type/h1" }
+              "content": {
+                "text": "Why now"
+              },
+              "style": {
+                "color": "token://color/text",
+                "font": "token://font/heading",
+                "size": "token://type/h1"
+              }
             },
             {
               "id": "why_bullets",
               "type": "bullet-list",
-              "content": { "items": ["Agents finally edit structure, not pixels", "Inference rides the user's own subscription", "Open contract, not a closed app"] },
-              "style": { "color": "token://color/text", "marker": "token://color/accent", "size": "token://type/body" }
+              "content": {
+                "items": [
+                  "Agents finally edit structure, not pixels",
+                  "Inference rides the user's own subscription",
+                  "Open contract, not a closed app"
+                ]
+              },
+              "style": {
+                "color": "token://color/text",
+                "marker": "token://color/accent",
+                "size": "token://type/body"
+              }
             }
           ]
         },
         {
           "id": "why_image",
           "type": "image-caption",
-          "content": { "src": "asset://images/diagram.png", "alt": "architecture", "caption": "Functional core / thin shell" },
-          "style": { "radius": "token://radius/md", "captionColor": "token://color/muted", "captionSize": "token://type/caption" },
-          "layout": { "sizing": { "width": "fill", "height": "fill" } }
+          "content": {
+            "src": "asset://images/diagram.png",
+            "alt": "architecture",
+            "caption": "Functional core / thin shell"
+          },
+          "style": {
+            "radius": "token://radius/md",
+            "captionColor": "token://color/muted",
+            "captionSize": "token://type/caption"
+          },
+          "layout": {
+            "sizing": {
+              "width": "fill",
+              "height": "fill"
+            }
+          }
         }
       ]
     },
@@ -135,20 +285,39 @@
       "id": "slide_close",
       "type": "slide",
       "role": "closing",
-      "style": { "background": "token://color/bg" },
-      "layout": { "direction": "column", "gap": "token://space/md", "justify": "center", "padding": "token://space/xl" },
+      "style": {
+        "background": "token://color/bg"
+      },
+      "layout": {
+        "direction": "column",
+        "gap": "token://space/md",
+        "justify": "center",
+        "padding": "token://space/xl"
+      },
       "children": [
         {
           "id": "close_title",
           "type": "title",
-          "content": { "text": "Let's build it" },
-          "style": { "color": "token://color/text", "font": "token://font/heading", "size": "token://type/display" }
+          "content": {
+            "text": "Let's build it"
+          },
+          "style": {
+            "color": "token://color/text",
+            "font": "token://font/heading",
+            "size": "token://type/display"
+          }
         },
         {
           "id": "close_contact",
           "type": "heading",
-          "content": { "text": "founders@acme.co" },
-          "style": { "color": "token://color/accent", "font": "token://font/body", "size": "token://type/h2" }
+          "content": {
+            "text": "founders@acme.co"
+          },
+          "style": {
+            "color": "token://color/accent",
+            "font": "token://font/body",
+            "size": "token://type/h2"
+          }
         }
       ]
     },
@@ -156,48 +325,148 @@
       "id": "slide_charts",
       "type": "slide",
       "role": "content",
-      "style": { "background": "token://color/bg" },
-      "layout": { "direction": "column", "gap": "token://space/lg", "padding": "token://space/xl" },
+      "style": {
+        "background": "token://color/bg"
+      },
+      "layout": {
+        "direction": "column",
+        "gap": "token://space/lg",
+        "padding": "token://space/xl"
+      },
       "children": [
         {
           "id": "charts_title",
           "type": "title",
-          "content": { "text": "Revenue & pricing" },
-          "style": { "color": "token://color/text", "font": "token://font/heading", "size": "token://type/h1" }
+          "content": {
+            "text": "Revenue & pricing"
+          },
+          "style": {
+            "color": "token://color/text",
+            "font": "token://font/heading",
+            "size": "token://type/h1"
+          }
         },
         {
           "id": "charts_cols",
           "type": "two-column",
           "role": "layout",
-          "layout": { "direction": "row", "gap": "token://space/xl", "align": "start" },
+          "layout": {
+            "direction": "row",
+            "gap": "token://space/xl",
+            "align": "start"
+          },
           "children": [
             {
               "id": "charts_left",
               "type": "container",
-              "layout": { "direction": "column", "gap": "token://space/md", "sizing": { "width": "fill" } },
+              "layout": {
+                "direction": "column",
+                "gap": "token://space/md",
+                "sizing": {
+                  "width": "fill"
+                }
+              },
               "children": [
-                { "id": "charts_left_h", "type": "heading", "content": { "text": "ARR by quarter ($M)" }, "style": { "color": "token://color/muted", "font": "token://font/body", "size": "token://type/h2" } },
+                {
+                  "id": "charts_left_h",
+                  "type": "heading",
+                  "content": {
+                    "text": "ARR by quarter ($M)"
+                  },
+                  "style": {
+                    "color": "token://color/muted",
+                    "font": "token://font/body",
+                    "size": "token://type/h2"
+                  }
+                },
                 {
                   "id": "charts_bar",
                   "type": "bar-chart",
                   "role": "chart",
-                  "content": { "data": [ { "label": "Q1", "value": 12 }, { "label": "Q2", "value": 19 }, { "label": "Q3", "value": 27 }, { "label": "Q4", "value": 38 } ] },
-                  "style": { "bar": "token://color/accent", "labelColor": "token://color/muted", "color": "token://color/text" }
+                  "content": {
+                    "data": [
+                      {
+                        "label": "Q1",
+                        "value": 12
+                      },
+                      {
+                        "label": "Q2",
+                        "value": 19
+                      },
+                      {
+                        "label": "Q3",
+                        "value": 27
+                      },
+                      {
+                        "label": "Q4",
+                        "value": 38
+                      }
+                    ]
+                  },
+                  "style": {
+                    "bar": "token://color/accent",
+                    "labelColor": "token://color/muted",
+                    "color": "token://color/text"
+                  }
                 }
               ]
             },
             {
               "id": "charts_right",
               "type": "container",
-              "layout": { "direction": "column", "gap": "token://space/md", "sizing": { "width": "fill" } },
+              "layout": {
+                "direction": "column",
+                "gap": "token://space/md",
+                "sizing": {
+                  "width": "fill"
+                }
+              },
               "children": [
-                { "id": "charts_right_h", "type": "heading", "content": { "text": "Pricing" }, "style": { "color": "token://color/muted", "font": "token://font/body", "size": "token://type/h2" } },
+                {
+                  "id": "charts_right_h",
+                  "type": "heading",
+                  "content": {
+                    "text": "Pricing"
+                  },
+                  "style": {
+                    "color": "token://color/muted",
+                    "font": "token://font/body",
+                    "size": "token://type/h2"
+                  }
+                },
                 {
                   "id": "charts_table",
                   "type": "table",
                   "role": "table",
-                  "content": { "columns": ["Plan", "Price", "Seats"], "rows": [ ["Starter", "$0", "1"], ["Team", "$29", "10"], ["Scale", "$99", "50"] ] },
-                  "style": { "color": "token://color/text", "headColor": "token://color/accent", "lineColor": "token://color/surface" }
+                  "content": {
+                    "columns": [
+                      "Plan",
+                      "Price",
+                      "Seats"
+                    ],
+                    "rows": [
+                      [
+                        "Starter",
+                        "$0",
+                        "1"
+                      ],
+                      [
+                        "Team",
+                        "$29",
+                        "10"
+                      ],
+                      [
+                        "Scale",
+                        "$99",
+                        "50"
+                      ]
+                    ]
+                  },
+                  "style": {
+                    "color": "token://color/text",
+                    "headColor": "token://color/accent",
+                    "lineColor": "token://color/surface"
+                  }
                 }
               ]
             }

@@ -89,7 +89,7 @@ export const CHROME_CSS = `
 .dc-dd-item.sel{ color:#ec5a13; font-weight:600; }
 .dc-sw{ width:15px; height:15px; border-radius:5px; border:1px solid rgba(0,0,0,.12); display:inline-block; flex:none; }
 .dc-seg{ display:flex; border:1px solid #e6e8ee; border-radius:10px; overflow:hidden; height:34px; }
-.dc-seg button{ width:36px; border:none; border-right:1px solid #eef0f2; background:#fff; color:#666c78; cursor:pointer; font-size:13px; transition:background .12s; }
+.dc-seg button{ width:38px; display:flex; align-items:center; justify-content:center; border:none; border-right:1px solid #eef0f2; background:#fff; color:#5b606b; cursor:pointer; transition:background .12s; }
 .dc-seg button:last-child{ border-right:none; }
 .dc-seg button:hover{ background:#f6f7f9; }
 .dc-seg button.on{ background:#ec5a13; color:#fff; }
@@ -174,6 +174,8 @@ export const CLIENT_JS = `
   }
   function tokenKey(ref){ if(!ref) return ''; var m=/token:\\/\\/[a-z]+\\/([A-Za-z0-9-]+)/.exec(ref); return m?m[1]:''; }
   function cap(s){ return (''+s).charAt(0).toUpperCase()+(''+s).slice(1); }
+  var FONT_LABELS={ dmsans:'DM Sans', spacegrotesk:'Space Grotesk', playfair:'Playfair Display', merriweather:'Merriweather', heading:'Heading', body:'Body' };
+  function fontLabel(k){ return FONT_LABELS[k]||cap(k); }
   // Apply edits optimistically to the live DOM so style/position changes are instant and the
   // slide doesn't have to be rebuilt (which flashes + drops the selection). Returns true only
   // if EVERY op was something we can render locally; structural ops fall back to a rebuild.
@@ -261,11 +263,16 @@ export const CLIENT_JS = `
     function renderTrg(){ trg.innerHTML=''; var it=find(o.value); if(it&&it.swatch){ var s=document.createElement('span'); s.className='dc-sw'; s.style.background=it.swatch; trg.appendChild(s); } var t=document.createElement('span'); t.textContent=it?it.label:'—'; trg.appendChild(t); var cv=document.createElement('span'); cv.className='dc-cv'; trg.appendChild(cv); }
     renderTrg();
     var menu=document.createElement('div'); menu.className='dc-dd-menu';
-    o.items.forEach(function(it){ var b=document.createElement('button'); b.type='button'; b.className='dc-dd-item'+(it.v===o.value?' sel':''); if(it.swatch){ var s=document.createElement('span'); s.className='dc-sw'; s.style.background=it.swatch; b.appendChild(s); } var t=document.createElement('span'); t.textContent=it.label; b.appendChild(t); b.onclick=function(ev){ ev.stopPropagation(); o.value=it.v; renderTrg(); menu.classList.remove('on'); o.onSelect(it.v); }; menu.appendChild(b); });
+    o.items.forEach(function(it){ var b=document.createElement('button'); b.type='button'; b.className='dc-dd-item'+(it.v===o.value?' sel':''); if(it.swatch){ var s=document.createElement('span'); s.className='dc-sw'; s.style.background=it.swatch; b.appendChild(s); } var t=document.createElement('span'); t.textContent=it.label; if(it.face) t.style.fontFamily=it.face; b.appendChild(t); b.onclick=function(ev){ ev.stopPropagation(); o.value=it.v; renderTrg(); menu.classList.remove('on'); o.onSelect(it.v); }; menu.appendChild(b); });
     trg.onclick=function(ev){ ev.stopPropagation(); var willOpen=!menu.classList.contains('on'); var all=document.querySelectorAll('.dc-dd-menu.on'); for(var i=0;i<all.length;i++) all[i].classList.remove('on'); if(willOpen) menu.classList.add('on'); };
     wrap.appendChild(trg); wrap.appendChild(menu); return wrap;
   }
-  function alignSeg(cid,cur){ var seg=document.createElement('div'); seg.className='dc-seg'; ['left','center','right'].forEach(function(a){ var b=document.createElement('button'); b.type='button'; b.textContent=a.charAt(0).toUpperCase(); if(a===cur) b.className='on'; b.onclick=function(ev){ ev.stopPropagation(); op([{op:'set_align',nodeId:cid,value:a}]); }; seg.appendChild(b); }); return seg; }
+  var ALIGN_ICONS={
+    left:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="14" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>',
+    center:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="5" y1="18" x2="19" y2="18"/></svg>',
+    right:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="6" y1="18" x2="21" y2="18"/></svg>'
+  };
+  function alignSeg(cid,cur){ var seg=document.createElement('div'); seg.className='dc-seg'; ['left','center','right'].forEach(function(a){ var b=document.createElement('button'); b.type='button'; b.title=a; b.innerHTML=ALIGN_ICONS[a]; if(a===cur) b.className='on'; b.onclick=function(ev){ ev.stopPropagation(); op([{op:'set_align',nodeId:cid,value:a}]); }; seg.appendChild(b); }); return seg; }
   function insertBtn(label,blockId){ var b=document.createElement('button'); b.type='button'; b.className='dc-add'; b.textContent=label; b.onclick=function(ev){ ev.stopPropagation(); var pid=curSlideId(); if(!pid) return; post('/api/insert_block',{blockId:blockId,parentId:pid,index:999}).then(function(res){ if(res&&res.error) flash('error: '+res.error); else flash('added '+label); }); }; return b; }
 
   function select(el){
@@ -279,7 +286,7 @@ export const CLIENT_JS = `
   function buildTool(cid,type,node){
     tool.className=''; tool.innerHTML='';
     var sp=styleProps(type); var th=window.DC_THEME||{}; var st=(node&&node.style)||{}; var cf=contentField(type);
-    if(sp.font){ tool.appendChild(group('Font', makeDropdown({ value:tokenKey(st[sp.font]), items:(th.font||[]).map(function(k){ return {v:k,label:cap(k)}; }), onSelect:function(v){ applyToken(cid,sp.font,'token://font/'+v); } }))); }
+    if(sp.font){ tool.appendChild(group('Font', makeDropdown({ value:tokenKey(st[sp.font]), items:(th.font||[]).map(function(k){ return {v:k,label:fontLabel(k),face:'var(--font-'+k+')'}; }), onSelect:function(v){ applyToken(cid,sp.font,'token://font/'+v); } }))); }
     if(sp.size){ var sizes=th.type||{}; var keys=Object.keys(sizes).sort(function(a,b){ return sizes[b]-sizes[a]; }); tool.appendChild(group('Size', makeDropdown({ value:tokenKey(st[sp.size]), items:keys.map(function(k){ return {v:k,label:''+sizes[k]}; }), onSelect:function(v){ applyToken(cid,sp.size,'token://type/'+v); } }))); }
     if(sp.color){ var cols=th.color||{}; var ck=Object.keys(cols); tool.appendChild(group('Color', makeDropdown({ value:tokenKey(st[sp.color]), items:ck.map(function(k){ return {v:k,label:cap(k),swatch:cols[k]}; }), onSelect:function(v){ applyToken(cid,sp.color,'token://color/'+v); } }))); }
     if(cf==='text'||cf==='items'){ tool.appendChild(alignSeg(cid,(node&&node.textAlign)||'left')); }

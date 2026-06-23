@@ -139,6 +139,8 @@ export function createViewerServer(opts: ViewerOptions) {
 
     return (
       '<!doctype html><html lang="ru"><head><meta charset="utf-8"/><title>deck-contract</title>' +
+      '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
+      '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Roboto:wght@400;500;700&family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;600;700;800&family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&family=Playfair+Display:wght@400;600;700;800&family=Lora:wght@400;600;700&family=Merriweather:wght@400;700&family=Oswald:wght@400;500;700&display=swap">' +
       '<style id="dc-theme">' + css + "</style><style>" + CHROME_CSS + "</style></head><body class=\"dc-app\">" +
       '<div id="dc-left"><div class="dc-rail">' +
       '<button class="dc-tab dc-act" data-tab="slides"><span class="dc-ico">▤</span>Slides</button>' +
