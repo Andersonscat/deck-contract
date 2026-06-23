@@ -1,0 +1,21 @@
+{
+  "name": "deck-contract-monorepo",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "preview": "tsx examples/preview.ts"
+  },
+  "devDependencies": {
+    "@deck/compile": "workspace:*",
+    "@deck/contract": "workspace:*",
+    "@deck/core": "workspace:*",
+    "@types/node": "^22.10.0",
+    "tsx": "^4.22.4",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
