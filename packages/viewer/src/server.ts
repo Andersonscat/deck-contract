@@ -104,7 +104,6 @@ export function createViewerServer(opts: ViewerOptions) {
       '<div class="dc-panel2" data-panel="brand"><h4>Цвета темы</h4><div class="dc-swatches">' + swatches + "</div></div>" +
       "</div></div>" +
       '<div id="dc-center">' +
-      '<div id="dc-top"><button id="dc-prev">‹</button><span id="dc-count"></span><button id="dc-next">›</button></div>' +
       '<div id="dc-stage">' + frames + "</div>" +
       '<div id="dc-panel">click an element to select it</div><div id="dc-flash"></div>' +
       "</div>" +
@@ -166,11 +165,11 @@ export function createViewerServer(opts: ViewerOptions) {
         return json({ ok: true });
       }
       if (req.method === "POST" && url === "/api/chat") {
-        const { message } = JSON.parse(await body(req));
+        const { message, currentSlideId } = JSON.parse(await body(req));
         if (!apiKey) return json({ reply: "AI chat disabled: set ANTHROPIC_API_KEY.", applied: 0 });
         try {
           const deck = await readDeck();
-          const { reply, ops } = await runChat(message, deck, await readSelection(), apiKey);
+          const { reply, ops } = await runChat(message, deck, await readSelection(), apiKey, currentSlideId);
           let applied = 0;
           if (ops.length) {
             const next = apply(deck, parseOps(ops)).deck;

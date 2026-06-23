@@ -54,6 +54,7 @@ export async function runChat(
   deck: Deck,
   selection: { nodeId: string } | null,
   apiKey: string,
+  currentSlideId?: string,
   model = "claude-sonnet-4-6",
 ): Promise<ChatResult> {
   const system = [
@@ -67,6 +68,7 @@ export async function runChat(
     "Rules: style values MUST be theme tokens (never raw hex/px). Only edit nodes that exist.",
     "Available theme tokens: " + tokens(deck),
     "Current components:\n" + outline(deck),
+    currentSlideId ? "The user is currently viewing slide: " + currentSlideId + ' (treat "this slide"/"here" as this slide).' : "",
     selection ? "The user has selected node: " + selection.nodeId + ' (treat "this"/"selected" as this node).' : "No node is selected.",
     'Reply with ONE JSON object and nothing else: {"reply": short message to the user, "ops": [ ... ]}. Use ops:[] if no edit is needed.',
   ].join("\n");
