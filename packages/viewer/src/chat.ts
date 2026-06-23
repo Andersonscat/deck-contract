@@ -35,20 +35,6 @@ function tokens(deck: Deck): string {
   return out.join(", ");
 }
 
-function extractJson(text: string): { reply?: string; ops?: unknown[] } {
-  let s = text.trim();
-  const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fence) s = fence[1]!.trim();
-  const a = s.indexOf("{");
-  const b = s.lastIndexOf("}");
-  if (a >= 0 && b > a) s = s.slice(a, b + 1);
-  try {
-    return JSON.parse(s);
-  } catch {
-    return { reply: text.trim(), ops: [] };
-  }
-}
-
 export async function runChat(
   message: string,
   deck: Deck,
@@ -85,17 +71,47 @@ export async function runChat(
       ? "The user has SELECTED this component — treat \"this\"/\"it\"/\"это\" and the bare noun (title/название/метрика…) as THIS node unless they clearly mean another:\n" +
         JSON.stringify(selectedNode)
       : "No component is selected — resolve the target from the components list by role on the current slide.",
-    'Reply with ONE JSON object and nothing else: {"reply": short message in English, "ops": [ ... ]}. Use ops:[] if no edit is needed.',
+    "Call the edit_deck tool. Put a SHORT, friendly message in `reply` (plain English, never JSON, ops, ids, or code). Put the edits in `ops` (empty array if nothing to change). Do not write anything outside the tool call.",
   ].join("\n");
+
+  const tools = [
+    {
+      name: "edit_deck",
+      description: "Apply id-addressed edits to the deck and give the user a short message.",
+      input_schema: {
+        type: "object",
+        properties: {
+          reply: {
+            type: "string",
+            description: "A short, friendly message to the user in English. Never include JSON, ops, ids, or code.",
+          },
+          ops: { type: "array", items: { type: "object" }, description: "The id-addressed ops to apply." },
+        },
+        required: ["reply", "ops"],
+      },
+    },
+  ];
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "content-type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-    body: JSON.stringify({ model, max_tokens: 1024, system, messages: [{ role: "user", content: message }] }),
+    body: JSON.stringify({
+      model,
+      max_tokens: 1024,
+      system,
+      messages: [{ role: "user", content: message }],
+      tools,
+      tool_choice: { type: "tool", name: "edit_deck" },
+    }),
   });
   if (!res.ok) throw new Error("anthropic " + res.status + ": " + (await res.text()).slice(0, 300));
-  const data = (await res.json()) as { content?: { text?: string }[] };
-  const text = (data.content ?? []).map((c) => c.text ?? "").join("");
-  const parsed = extractJson(text);
-  return { reply: parsed.reply ?? "(no reply)", ops: Array.isArray(parsed.ops) ? parsed.ops : [] };
+  const data = (await res.json()) as {
+    content?: Array<{ type: string; name?: string; input?: { reply?: string; ops?: unknown[] } }>;
+  };
+  // tool_choice forces a single edit_deck tool call: reply is clean text, ops is structured.
+  const tu = (data.content ?? []).find((c) => c.type === "tool_use" && c.name === "edit_deck");
+  if (tu && tu.input) {
+    return { reply: tu.input.reply ?? "Done.", ops: Array.isArray(tu.input.ops) ? tu.input.ops : [] };
+  }
+  return { reply: "Sorry, I couldn't process that. Try rephrasing.", ops: [] };
 }
