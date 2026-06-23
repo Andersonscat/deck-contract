@@ -30,6 +30,9 @@ const STYLE_PROP_CSS: Record<string, string> = {
   captionSize: "--caption-size",
   radius: "border-radius",
   background: "background",
+  bar: "--bar-color",
+  headColor: "--head-color",
+  lineColor: "--line-color",
 };
 
 function esc(s: string): string {
@@ -139,6 +142,32 @@ function renderLeaf(node: DeckNode): string {
       return `<figure${attrs(node)}><img src="${esc(c.src ?? "")}" alt="${esc(
         c.alt ?? "",
       )}"/>${c.caption ? `<figcaption>${esc(c.caption)}</figcaption>` : ""}</figure>`;
+    case "bar-chart": {
+      const data = c.data ?? [];
+      // Bar height in px (layout-independent, so the chart reads the same in flow or in
+      // a frame). Scaled to the largest value; pure -> byte-identical output.
+      const max = data.reduce((m, d) => Math.max(m, d.value), 0) || 1;
+      const cols = data
+        .map(
+          (d) =>
+            `<div class="bc-col"><div class="bc-track"><div class="bc-bar" style="height:${fmt(
+              (d.value / max) * 240,
+            )}px"></div></div><div class="bc-val">${esc(String(d.value))}</div><div class="bc-cat">${esc(
+              d.label,
+            )}</div></div>`,
+        )
+        .join("");
+      return `<div${attrs(node)}><div class="bar-chart">${cols}</div></div>`;
+    }
+    case "table": {
+      const head = (c.columns ?? []).length
+        ? `<thead><tr>${(c.columns ?? []).map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead>`
+        : "";
+      const rows = (c.rows ?? [])
+        .map((r) => `<tr>${r.map((cell) => `<td>${esc(cell)}</td>`).join("")}</tr>`)
+        .join("");
+      return `<div${attrs(node)}><table class="dc-table">${head}<tbody>${rows}</tbody></table></div>`;
+    }
     default:
       return `<div${attrs(node)}>${esc(c.text ?? "")}</div>`;
   }
@@ -164,7 +193,16 @@ html,body{padding:0}
 .slide{position:relative;overflow:hidden;font-family:var(--font-body);color:var(--color-text)}
 .slide img{max-width:100%;display:block}
 ul{list-style:disc;padding-left:1.2em}
-ul li::marker{color:var(--marker-color)}`;
+ul li::marker{color:var(--marker-color)}
+.bar-chart{display:flex;align-items:flex-end;gap:18px;width:100%}
+.bc-col{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1}
+.bc-track{height:240px;width:100%;display:flex;align-items:flex-end;justify-content:center}
+.bc-bar{width:62%;max-width:72px;background:var(--bar-color,var(--color-accent));border-radius:8px 8px 0 0}
+.bc-val{font-size:15px;font-weight:700}
+.bc-cat{font-size:14px;color:var(--label-color,var(--color-muted))}
+.dc-table{border-collapse:collapse;width:100%;font-size:18px}
+.dc-table th,.dc-table td{text-align:left;padding:11px 18px;border-bottom:1px solid var(--line-color,var(--color-surface))}
+.dc-table th{color:var(--head-color,var(--color-accent));font-family:var(--font-heading);font-weight:700}`;
 
 /** Per-slide fragments + shared CSS, for hosts that frame each slide separately (the viewer). */
 export function compileSlides(deck: Deck): { css: string; slides: { id: string; html: string }[] } {

@@ -53,9 +53,9 @@ describe("DeckService — the full model-driven tool flow", () => {
       const otherStill = await service.getNode(deckId, "title_sub");
       expect(otherStill.content!.text).toBe("Seed deck · 2026");
 
-      // render -> 4 slides, no overflow on the well-formed template
+      // render -> 5 slides, no overflow on the well-formed template
       const rendered = await service.render(deckId);
-      expect(rendered.slides).toHaveLength(4);
+      expect(rendered.slides).toHaveLength(5);
       expect(rendered.issues.filter((i) => i.code === "OVERFLOW")).toEqual([]);
       expect(rendered.slides[0]!.pngPath).toMatch(/\.png$/);
 

@@ -73,6 +73,11 @@ export const ContentSchema = z
     src: z.string().optional(),
     alt: z.string().optional(),
     caption: z.string().optional(),
+    /** bar-chart: ordered categories with numeric values. */
+    data: z.array(z.object({ label: z.string(), value: z.number() }).strict()).optional(),
+    /** table: header cells + body rows (rows are arrays of string cells). */
+    columns: z.array(z.string()).optional(),
+    rows: z.array(z.array(z.string())).optional(),
   })
   .strict();
 export type Content = z.infer<typeof ContentSchema>;

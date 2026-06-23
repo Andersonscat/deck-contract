@@ -27,10 +27,13 @@ const LABELS: Record<string, string> = {
   "bullet-list": "List",
   quote: "Quote",
   "image-caption": "Image",
+  "bar-chart": "Bar chart",
+  table: "Table",
+  "two-column": "Two columns",
   heading: "Heading",
   subtitle: "Subheading",
 };
-const ELEMENT_BLOCKS = ["stat-callout", "bullet-list", "quote", "image-caption"];
+const ELEMENT_BLOCKS = ["stat-callout", "bullet-list", "quote", "image-caption", "bar-chart", "table", "two-column"];
 const TEXT_BLOCKS = ["heading", "subtitle"];
 
 const BULLET_ROW =
@@ -40,6 +43,18 @@ const PREVIEW: Record<string, string> = {
   "bullet-list": BULLET_ROW + BULLET_ROW + BULLET_ROW,
   quote: '<div style="font:700 32px/1 Georgia,serif;color:var(--color-accent)">“</div><div style="height:6px;width:84px;background:#5a6172;border-radius:3px;margin-top:2px"></div>',
   "image-caption": '<div style="width:100%;height:50px;background:#3a4150;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#8b93a4;font-size:22px">▧</div>',
+  "bar-chart": '<div style="display:flex;align-items:flex-end;gap:5px;height:48px">' +
+    '<div style="width:10px;height:40%;background:var(--color-accent);border-radius:3px 3px 0 0"></div>' +
+    '<div style="width:10px;height:62%;background:var(--color-accent);border-radius:3px 3px 0 0"></div>' +
+    '<div style="width:10px;height:82%;background:var(--color-accent);border-radius:3px 3px 0 0"></div>' +
+    '<div style="width:10px;height:100%;background:var(--color-accent);border-radius:3px 3px 0 0"></div></div>',
+  table: '<div style="width:100%;font-size:9px;color:var(--color-muted)">' +
+    '<div style="display:flex;gap:6px;color:var(--color-accent);font-weight:700;border-bottom:1px solid #3a4150;padding-bottom:3px"><span style="flex:1">Plan</span><span>$</span></div>' +
+    '<div style="display:flex;gap:6px;padding-top:3px"><span style="flex:1">Team</span><span>29</span></div>' +
+    '<div style="display:flex;gap:6px"><span style="flex:1">Scale</span><span>99</span></div></div>',
+  "two-column": '<div style="display:flex;gap:6px;width:100%">' +
+    '<div style="flex:1;height:44px;background:#3a4150;border-radius:6px"></div>' +
+    '<div style="flex:1;height:44px;background:#3a4150;border-radius:6px"></div></div>',
   heading: '<div style="font:800 22px/1 sans-serif;color:var(--color-text)">Heading</div>',
   subtitle: '<div style="font:600 15px/1 sans-serif;color:var(--color-muted)">Subheading</div>',
 };

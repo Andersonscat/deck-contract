@@ -151,6 +151,59 @@
           "style": { "color": "token://color/accent", "font": "token://font/body", "size": "token://type/h2" }
         }
       ]
+    },
+    {
+      "id": "slide_charts",
+      "type": "slide",
+      "role": "content",
+      "style": { "background": "token://color/bg" },
+      "layout": { "direction": "column", "gap": "token://space/lg", "padding": "token://space/xl" },
+      "children": [
+        {
+          "id": "charts_title",
+          "type": "title",
+          "content": { "text": "Revenue & pricing" },
+          "style": { "color": "token://color/text", "font": "token://font/heading", "size": "token://type/h1" }
+        },
+        {
+          "id": "charts_cols",
+          "type": "two-column",
+          "role": "layout",
+          "layout": { "direction": "row", "gap": "token://space/xl", "align": "start" },
+          "children": [
+            {
+              "id": "charts_left",
+              "type": "container",
+              "layout": { "direction": "column", "gap": "token://space/md", "sizing": { "width": "fill" } },
+              "children": [
+                { "id": "charts_left_h", "type": "heading", "content": { "text": "ARR by quarter ($M)" }, "style": { "color": "token://color/muted", "font": "token://font/body", "size": "token://type/h2" } },
+                {
+                  "id": "charts_bar",
+                  "type": "bar-chart",
+                  "role": "chart",
+                  "content": { "data": [ { "label": "Q1", "value": 12 }, { "label": "Q2", "value": 19 }, { "label": "Q3", "value": 27 }, { "label": "Q4", "value": 38 } ] },
+                  "style": { "bar": "token://color/accent", "labelColor": "token://color/muted", "color": "token://color/text" }
+                }
+              ]
+            },
+            {
+              "id": "charts_right",
+              "type": "container",
+              "layout": { "direction": "column", "gap": "token://space/md", "sizing": { "width": "fill" } },
+              "children": [
+                { "id": "charts_right_h", "type": "heading", "content": { "text": "Pricing" }, "style": { "color": "token://color/muted", "font": "token://font/body", "size": "token://type/h2" } },
+                {
+                  "id": "charts_table",
+                  "type": "table",
+                  "role": "table",
+                  "content": { "columns": ["Plan", "Price", "Seats"], "rows": [ ["Starter", "$0", "1"], ["Team", "$29", "10"], ["Scale", "$99", "50"] ] },
+                  "style": { "color": "token://color/text", "headColor": "token://color/accent", "lineColor": "token://color/surface" }
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ]
 }

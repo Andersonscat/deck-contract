@@ -374,31 +374,33 @@ export const CLIENT_JS = `
   stage.addEventListener('mousedown',function(e){ var el=e.target.closest('#dc-stage [data-cid]'); if(!el||el.tagName==='SECTION') return; candEl=el; downPt={x:e.clientX,y:e.clientY}; dragged=false; });
   document.addEventListener('mousemove',function(e){
     if(resizing){ doResize(e); return; }
-    if(dragging){
-      var s=snapDrag(e); dragLast=s; // remember the last shown position so the drop commits EXACTLY it
-      var sdx=(s.L-dragStart.x/100*1280)*dragSc, sdy=(s.T-dragStart.y/100*720)*dragSc;
-      dragNode.style.transform='translate('+sdx+'px,'+sdy+'px)';
-      var c=cbox(); c.style.display='block'; c.textContent='x: '+Math.round(s.L)+' pt   y: '+Math.round(s.T)+' pt';
-      var r=dragNode.getBoundingClientRect(); c.style.left=(r.left+r.width/2)+'px'; c.style.top=Math.max(8,r.top-40)+'px';
-      drawGuides(dragNode,s);
-      return;
-    }
+    if(dragging){ var s=snapDrag(e); dragLast=s; applyDragVisual(s); return; }
     if(!candEl) return;
-    if(Math.abs(e.clientX-downPt.x)+Math.abs(e.clientY-downPt.y)>5) startDrag();
+    if(Math.abs(e.clientX-downPt.x)+Math.abs(e.clientY-downPt.y)>5) startDrag(e);
   });
   document.addEventListener('mouseup',function(e){ if(resizing){ endResize(); candEl=null; return; } if(dragging) endDrag(e); candEl=null; });
-  function startDrag(){
+  // The dragged element lives INSIDE the slide <section>, which carries transform:scale(sc).
+  // A child's CSS translate is in the section's UNSCALED space, then scaled by the section, so
+  // the on-screen move is translate*sc. The translate must therefore be the raw canvas-unit
+  // delta (NOT pre-multiplied by sc) — otherwise it double-scales (element lags the cursor by
+  // sc and then jumps forward by delta*(1-sc) on drop). This matches the on-drop left:% commit.
+  function applyDragVisual(s){
+    var sdx=(s.L-dragStart.x/100*1280), sdy=(s.T-dragStart.y/100*720);
+    dragNode.style.transform='translate('+sdx+'px,'+sdy+'px)';
+    var c=cbox(); c.style.display='block'; c.textContent='x: '+Math.round(s.L)+' pt   y: '+Math.round(s.T)+' pt';
+    var r=dragNode.getBoundingClientRect(); c.style.left=(r.left+r.width/2)+'px'; c.style.top=Math.max(8,r.top-40)+'px';
+    drawGuides(dragNode,s);
+  }
+  function startDrag(e){
     dragging=true; dragNode=candEl; dragged=true; dragLast=null; hideBox(); hideHandles(); document.body.style.cursor='grabbing';
     document.body.style.userSelect='none'; var sg=window.getSelection&&window.getSelection(); if(sg&&sg.removeAllRanges) sg.removeAllRanges();
-    // Coordinate origin = the slide <section> (the absolute-positioning containing block,
-    // because it carries transform:scale). Using .dc-frame here was the latent bug: the frame
-    // and the section don't share a top edge, so committed % didn't match the rendered position.
     var fr=dragNode.closest('section'); var frr=fr.getBoundingClientRect(); dragSc=frr.width/1280;
     var er=dragNode.getBoundingClientRect();
     dragHasFrame=(getComputedStyle(dragNode).position==='absolute');
     dragStart={ x:(er.left-frr.left)/dragSc/1280*100, y:(er.top-frr.top)/dragSc/720*100, w:er.width/dragSc/1280*100, h:er.height/dragSc/720*100, mx:downPt.x, my:downPt.y };
     var tg=buildTargets(dragNode,fr,dragSc); vTargets=tg.vT; hTargets=tg.hT; snapBoxes=tg.boxes;
     dragNode.style.zIndex='6';
+    dragLast=snapDrag(e); applyDragVisual(dragLast); // render the first frame immediately (no quick-flick)
   }
   // Smart alignment guides (phase 3a + 3b): snap the active box per axis to the slide
   // centre/edges AND to every other element's edges/centres. Everything is in canvas units
