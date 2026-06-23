@@ -54,6 +54,10 @@ export const CHROME_CSS = `
 #dc-tool{ display:flex; align-items:center; gap:12px; font:13px -apple-system,Segoe UI,sans-serif; color:#5b606b; white-space:nowrap; }
 #dc-tool.dc-empty{ color:#9aa0aa; }
 #dc-tool .dc-lbl{ color:#9298a3; font-size:11px; }
+#dc-history{ display:flex; gap:5px; padding-right:10px; margin-right:6px; border-right:1px solid #eef0f2; }
+#dc-history button{ width:34px; height:34px; display:flex; align-items:center; justify-content:center; border:1px solid #e6e8ee; background:#fff; color:#3a3f4a; border-radius:9px; cursor:pointer; }
+#dc-history button:hover:not(:disabled){ background:#f3f4f6; }
+#dc-history button:disabled{ color:#cad0d8; cursor:default; }
 .dc-grp{ display:flex; align-items:center; gap:7px; }
 .dc-dd{ position:relative; }
 .dc-dd-trg{ height:34px; min-width:60px; display:flex; align-items:center; justify-content:space-between; gap:9px; border:1px solid #e6e8ee; background:#fff; border-radius:10px; padding:0 11px; cursor:pointer; font-size:13px; color:#1f2330; transition:background .12s,border-color .12s; }
@@ -187,6 +191,9 @@ export const CLIENT_JS = `
   document.addEventListener('keydown',function(e){
     var t=e.target, tag=t&&t.tagName;
     if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(t&&t.getAttribute&&t.getAttribute('contenteditable')==='true')) return;
+    var mod=e.metaKey||e.ctrlKey;
+    if(mod&&(e.key==='z'||e.key==='Z')){ e.preventDefault(); if(e.shiftKey) doRedo(); else doUndo(); return; }
+    if(mod&&(e.key==='y'||e.key==='Y')){ e.preventDefault(); doRedo(); return; }
     if(e.key==='ArrowDown'){ e.preventDefault(); goTo(Math.min(cur+1,frames.length-1)); }
     if(e.key==='ArrowUp'){ e.preventDefault(); goTo(Math.max(cur-1,0)); }
     if((e.key==='Delete'||e.key==='Backspace')&&sel){ e.preventDefault(); deleteNode(sel.getAttribute('data-cid')); }
@@ -323,6 +330,15 @@ export const CLIENT_JS = `
   function autoGrow(){ ci.style.height='auto'; ci.style.height=Math.min(ci.scrollHeight,140)+'px'; }
   ci.addEventListener('input',autoGrow);
   ci.addEventListener('keydown',function(e){ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); document.getElementById('dc-chat-form').requestSubmit(); } });
+
+  // undo / redo
+  var undoBtn=document.getElementById('dc-undo'), redoBtn=document.getElementById('dc-redo');
+  function setHist(h){ if(undoBtn) undoBtn.disabled=!(h&&h.canUndo); if(redoBtn) redoBtn.disabled=!(h&&h.canRedo); }
+  function refreshHist(){ fetch('/api/history').then(function(r){ return r.json(); }).then(setHist).catch(function(){}); }
+  function doUndo(){ post('/api/undo',{}).then(setHist); }
+  function doRedo(){ post('/api/redo',{}).then(setHist); }
+  if(undoBtn) undoBtn.onclick=function(ev){ ev.stopPropagation(); doUndo(); };
+  if(redoBtn) redoBtn.onclick=function(ev){ ev.stopPropagation(); doRedo(); };
   document.getElementById('dc-chat-form').addEventListener('submit',function(e){ e.preventDefault();
     var msg=ci.value.trim(); if(!msg) return;
     ci.value=''; autoGrow(); addMsg('user',msg); var pending=addMsg('sys','…');
@@ -346,6 +362,7 @@ export const CLIENT_JS = `
       }
       fitAll(); clearSel();
       if(prev){ var again=document.querySelector('#dc-stage [data-cid="'+prev+'"]'); if(again) select(again); }
+      refreshHist();
     }).catch(function(){ location.reload(); });
   }
   try{ var es=new EventSource('/api/events'); es.onmessage=function(){ softRefresh(); }; }catch(e){}
@@ -354,5 +371,6 @@ export const CLIENT_JS = `
   var saved=parseInt(sessionStorage.getItem('dc-cur')||'0',10); if(saved>0&&frames[saved]) frames[saved].scrollIntoView({block:'center'});
   updateCurrent();
   buildDefaultTool();
+  refreshHist();
 })();
 `;

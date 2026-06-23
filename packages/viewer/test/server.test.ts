@@ -38,7 +38,7 @@ describe("viewer server", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ ops: [{ op: "set_text", nodeId: "title_main", value: "Edited by user" }] }),
     });
-    expect(await res.json()).toEqual({ ok: true });
+    expect(await res.json()).toMatchObject({ ok: true });
     const deck = JSON.parse(await readFile(deckPath, "utf8"));
     expect(deck.slides[0].children[0].children[0].content.text).toBe("Edited by user");
   });

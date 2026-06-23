@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { watch, type FSWatcher } from "node:fs";
 import { parseDeck, type Deck, type DeckNode } from "@deck/contract";
 import { compileSlides } from "@deck/compile";
-import { apply, parseOps, cloneWithNewIds, buildIndex } from "@deck/core";
+import { apply, parseOps, cloneWithNewIds, buildIndex, type Op } from "@deck/core";
 import { CHROME_CSS, CLIENT_JS } from "./client.js";
 import { runChat } from "./chat.js";
 
@@ -76,6 +76,19 @@ export function createViewerServer(opts: ViewerOptions) {
     }
   };
 
+  // Undo/redo history. Every mutation funnels through commit(), which records the
+  // inverse (returned by apply) so it can be replayed. Local single-deck session.
+  const undoStack: Op[][] = [];
+  const redoStack: Op[][] = [];
+  const writeDeck = (deck: unknown) => writeFile(opts.deckPath, JSON.stringify(deck, null, 2), "utf8");
+  const hist = () => ({ canUndo: undoStack.length > 0, canRedo: redoStack.length > 0 });
+  const commit = async (ops: unknown) => {
+    const { deck: next, inverse } = apply(await readDeck(), parseOps(ops));
+    await writeDeck(next);
+    undoStack.push(inverse);
+    redoStack.length = 0;
+  };
+
   async function buildPage(): Promise<string> {
     const deck = await readDeck();
     const blocks = await readBlocks();
@@ -123,7 +136,10 @@ export function createViewerServer(opts: ViewerOptions) {
       '<div class="dc-panel2" data-panel="brand"><h4>Theme colors</h4><div class="dc-swatches">' + swatches + "</div></div>" +
       "</div></div>" +
       '<div id="dc-center">' +
-      '<div id="dc-topbar"><div id="dc-tool" class="dc-empty">Select an element to edit it</div></div>' +
+      '<div id="dc-topbar"><div id="dc-history">' +
+      '<button id="dc-undo" title="Undo (Cmd/Ctrl+Z)" disabled><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-1"/></svg></button>' +
+      '<button id="dc-redo" title="Redo (Cmd/Ctrl+Shift+Z)" disabled><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h1"/></svg></button>' +
+      '</div><div id="dc-tool" class="dc-empty">Select an element to edit it</div></div>' +
       '<div id="dc-stage">' + frames + "</div>" +
       '<div id="dc-flash"></div>' +
       "</div>" +
@@ -173,9 +189,8 @@ export function createViewerServer(opts: ViewerOptions) {
       if (req.method === "POST" && url === "/api/op") {
         const { ops } = JSON.parse(await body(req));
         try {
-          const next = apply(await readDeck(), parseOps(ops)).deck;
-          await writeFile(opts.deckPath, JSON.stringify(next, null, 2), "utf8");
-          return json({ ok: true });
+          await commit(ops);
+          return json({ ok: true, ...hist() });
         } catch (e) {
           return json({ error: e instanceof Error ? e.message : String(e) });
         }
@@ -186,13 +201,29 @@ export function createViewerServer(opts: ViewerOptions) {
           const block = (await readBlocks())[blockId];
           if (!block) return json({ error: 'unknown block "' + blockId + '"' });
           const { node } = cloneWithNewIds(block);
-          const next = apply(await readDeck(), [{ op: "insert_node", parentId, index: index ?? 999, node }]).deck;
-          await writeFile(opts.deckPath, JSON.stringify(next, null, 2), "utf8");
-          return json({ ok: true, newNodeId: node.id });
+          await commit([{ op: "insert_node", parentId, index: index ?? 999, node }]);
+          return json({ ok: true, newNodeId: node.id, ...hist() });
         } catch (e) {
           return json({ error: e instanceof Error ? e.message : String(e) });
         }
       }
+      if (req.method === "POST" && url === "/api/undo") {
+        const inv = undoStack.pop();
+        if (!inv) return json({ ok: false, ...hist() });
+        const { deck: next, inverse } = apply(await readDeck(), inv);
+        await writeDeck(next);
+        redoStack.push(inverse);
+        return json({ ok: true, ...hist() });
+      }
+      if (req.method === "POST" && url === "/api/redo") {
+        const r = redoStack.pop();
+        if (!r) return json({ ok: false, ...hist() });
+        const { deck: next, inverse } = apply(await readDeck(), r);
+        await writeDeck(next);
+        undoStack.push(inverse);
+        return json({ ok: true, ...hist() });
+      }
+      if (req.method === "GET" && url === "/api/history") return json(hist());
       if (req.method === "POST" && url === "/api/selection" && opts.selectionPath) {
         const { nodeId } = JSON.parse(await body(req));
         await writeFile(opts.selectionPath, JSON.stringify({ nodeId }), "utf8");
@@ -207,11 +238,10 @@ export function createViewerServer(opts: ViewerOptions) {
           const { reply, ops } = await runChat(message, deck, selection, apiKey, currentSlideId);
           let applied = 0;
           if (ops.length) {
-            const next = apply(deck, parseOps(ops)).deck;
-            await writeFile(opts.deckPath, JSON.stringify(next, null, 2), "utf8");
+            await commit(ops);
             applied = ops.length;
           }
-          return json({ reply, applied });
+          return json({ reply, applied, ...hist() });
         } catch (e) {
           return json({ reply: "error: " + (e instanceof Error ? e.message : String(e)), applied: 0 });
         }
