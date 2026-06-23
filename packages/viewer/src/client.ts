@@ -20,7 +20,7 @@ export const CHROME_CSS = `
 .dc-panel2{ display:none; padding:16px; }
 .dc-panel2.dc-on{ display:block; }
 .dc-panel2 h4{ margin:0 0 12px; font-size:12px; color:#9298a3; font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
-.dc-slidethumb{ display:block; width:240px; height:135px; margin:0 0 12px; padding:0; position:relative; border:2px solid #c7cbd3; border-radius:6px; overflow:hidden; background:#000; cursor:pointer; }
+.dc-slidethumb{ display:block; width:240px; height:135px; margin:0 0 12px; padding:0; position:relative; border:2px solid #c7cbd3; border-radius:6px; overflow:hidden; background:#000; cursor:pointer; text-align:left; }
 .dc-slidethumb.dc-cur{ border-color:#ec5a13; }
 .dc-slidethumb > section{ transform:scale(0.1875); transform-origin:top left; pointer-events:none; }
 .dc-slidethumb .dc-no{ position:absolute; top:4px; left:7px; color:#fff; font:11px sans-serif; opacity:.85; }
