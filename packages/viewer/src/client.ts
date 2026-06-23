@@ -151,8 +151,10 @@ export const CLIENT_JS = `
     var lbl=document.createElement('span'); lbl.className='dc-lbl'; lbl.textContent='Insert'; tool.appendChild(lbl);
     [['heading','Text'],['stat-callout','Metric'],['bullet-list','List'],['image-caption','Image']].forEach(function(a){ var b=document.createElement('button'); b.type='button'; b.className='dc-add'; b.textContent=a[1]; b.onclick=function(ev){ ev.stopPropagation(); var pid=curSlideId(); if(!pid) return; post('/api/insert_block',{blockId:a[0],parentId:pid,index:999}).then(function(res){ if(res&&res.error) flash('error: '+res.error); else flash('added'); }); }; tool.appendChild(b); });
   }
-  function editText(el){ el.setAttribute('contenteditable','true'); el.focus(); var cid=el.getAttribute('data-cid');
-    function finish(){ el.removeAttribute('contenteditable'); var txt=(el.textContent||'').replace(/\\s+/g,' ').trim(); post('/api/op',{ops:[{op:'set_text',nodeId:cid,value:txt}]}).then(function(res){ if(res&&res.error) flash('error: '+res.error); }); }
+  function editText(el){ var orig=el.textContent||''; el.setAttribute('contenteditable','true'); el.focus(); var cid=el.getAttribute('data-cid');
+    function finish(){ el.removeAttribute('contenteditable'); var txt=(el.textContent||'').trim();
+      // commit text ONLY if it actually changed — otherwise we'd needlessly drop any sub-text marks
+      if(txt!==orig.trim()) post('/api/op',{ops:[{op:'set_text',nodeId:cid,value:txt}]}).then(function(res){ if(res&&res.error) flash('error: '+res.error); }); }
     el.addEventListener('blur',finish,{once:true});
     el.addEventListener('keydown',function(k){ if(k.key==='Enter'){ k.preventDefault(); el.blur(); } });
   }
@@ -205,6 +207,28 @@ export const CLIENT_JS = `
     },function(){ opInFlight--; forceRebuild(); });
   }
   function forceRebuild(){ fetch('/api/slides').then(function(r){ return r.json(); }).then(function(d){ if(d&&d.slides) applySlides(d.slides,true); }).catch(function(){}); }
+  // Sub-text styling: a non-collapsed text selection inside an element maps to a [from,to)
+  // character range, so Font/Size/Color style JUST that word/range (format_range). A collapsed
+  // caret (no selection) styles the whole node (set_token), as before. lastTextSel keeps the
+  // last range so it survives the blur a toolbar click can cause.
+  var lastTextSel=null;
+  function computeTextRange(){
+    var s=window.getSelection(); if(!s||s.rangeCount===0||s.isCollapsed) return null;
+    var r=s.getRangeAt(0);
+    var startEl=r.startContainer.nodeType===3?r.startContainer.parentElement:r.startContainer;
+    var el=startEl&&startEl.closest?startEl.closest('#dc-stage [data-cid]'):null;
+    if(!el||el.tagName==='SECTION'||!el.contains(r.endContainer)) return null;
+    var w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT,null), n, from=-1, to=-1, idx=0;
+    while((n=w.nextNode())){ if(n===r.startContainer) from=idx+r.startOffset; if(n===r.endContainer) to=idx+r.endOffset; idx+=(n.nodeValue||'').length; }
+    if(from<0||to<0) return null; if(from>to){ var t=from; from=to; to=t; } if(from===to) return null;
+    return { cid:el.getAttribute('data-cid'), from:from, to:to };
+  }
+  document.addEventListener('selectionchange',function(){ var r=computeTextRange(); if(r) lastTextSel=r; });
+  function applyToken(cid,prop,value){
+    if(prop==='color'||prop==='font'||prop==='size'){ var r=computeTextRange()||lastTextSel;
+      if(r&&r.cid===cid){ lastTextSel=null; op([{op:'format_range',nodeId:cid,target:{from:r.from,to:r.to},prop:prop,value:value}]); return; } }
+    op([{op:'set_token',nodeId:cid,prop:prop,value:value}]);
+  }
   // Copy / paste / duplicate an element. The copied node's subtree is held in a JS clipboard;
   // paste clones it server-side with fresh ids and drops it on the current slide, offset (and
   // cascaded on repeat) so it's visible. Cmd/Ctrl + C / V / D.
@@ -255,9 +279,9 @@ export const CLIENT_JS = `
   function buildTool(cid,type,node){
     tool.className=''; tool.innerHTML='';
     var sp=styleProps(type); var th=window.DC_THEME||{}; var st=(node&&node.style)||{}; var cf=contentField(type);
-    if(sp.font){ tool.appendChild(group('Font', makeDropdown({ value:tokenKey(st[sp.font]), items:(th.font||[]).map(function(k){ return {v:k,label:cap(k)}; }), onSelect:function(v){ op([{op:'set_token',nodeId:cid,prop:sp.font,value:'token://font/'+v}]); } }))); }
-    if(sp.size){ var sizes=th.type||{}; var keys=Object.keys(sizes).sort(function(a,b){ return sizes[b]-sizes[a]; }); tool.appendChild(group('Size', makeDropdown({ value:tokenKey(st[sp.size]), items:keys.map(function(k){ return {v:k,label:''+sizes[k]}; }), onSelect:function(v){ op([{op:'set_token',nodeId:cid,prop:sp.size,value:'token://type/'+v}]); } }))); }
-    if(sp.color){ var cols=th.color||{}; var ck=Object.keys(cols); tool.appendChild(group('Color', makeDropdown({ value:tokenKey(st[sp.color]), items:ck.map(function(k){ return {v:k,label:cap(k),swatch:cols[k]}; }), onSelect:function(v){ op([{op:'set_token',nodeId:cid,prop:sp.color,value:'token://color/'+v}]); } }))); }
+    if(sp.font){ tool.appendChild(group('Font', makeDropdown({ value:tokenKey(st[sp.font]), items:(th.font||[]).map(function(k){ return {v:k,label:cap(k)}; }), onSelect:function(v){ applyToken(cid,sp.font,'token://font/'+v); } }))); }
+    if(sp.size){ var sizes=th.type||{}; var keys=Object.keys(sizes).sort(function(a,b){ return sizes[b]-sizes[a]; }); tool.appendChild(group('Size', makeDropdown({ value:tokenKey(st[sp.size]), items:keys.map(function(k){ return {v:k,label:''+sizes[k]}; }), onSelect:function(v){ applyToken(cid,sp.size,'token://type/'+v); } }))); }
+    if(sp.color){ var cols=th.color||{}; var ck=Object.keys(cols); tool.appendChild(group('Color', makeDropdown({ value:tokenKey(st[sp.color]), items:ck.map(function(k){ return {v:k,label:cap(k),swatch:cols[k]}; }), onSelect:function(v){ applyToken(cid,sp.color,'token://color/'+v); } }))); }
     if(cf==='text'||cf==='items'){ tool.appendChild(alignSeg(cid,(node&&node.textAlign)||'left')); }
     tool.appendChild(insertBtn('Text','heading'));
   }

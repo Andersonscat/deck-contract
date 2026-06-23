@@ -4,12 +4,33 @@ import {
   NodeSchema,
   ContentSchema,
   FrameSchema,
+  MarkSchema,
+  MARK_PROPS,
   TOKEN_REF,
+  normalizeMarks,
+  setRangeStyle,
   type Content,
   type Deck,
   type DeckNode,
   type Frame,
+  type Mark,
 } from "@deck/contract";
+
+/** Where a range op points: explicit char offsets, or a text match (the AI's path). */
+export type RangeTarget = { from: number; to: number } | { match: string; nth?: number };
+type MarkProp = (typeof MARK_PROPS)[number];
+
+function resolveRange(text: string, target: RangeTarget, nodeId: string): { from: number; to: number } {
+  if ("from" in target) return { from: target.from, to: target.to };
+  const occ = target.nth ?? 1;
+  let idx = -1;
+  for (let n = 0; ; ) {
+    idx = text.indexOf(target.match, idx + 1);
+    if (idx < 0) break;
+    if (++n === occ) return { from: idx, to: idx + target.match.length };
+  }
+  throw new Error(`range op: occurrence ${occ} of "${target.match}" not found in "${nodeId}"`);
+}
 
 /**
  * Mutation layer. Ops address nodes by STABLE id (never by JSON Pointer / index),
@@ -34,6 +55,9 @@ export type Op =
   | { op: "insert_node"; parentId: string; index: number; node: DeckNode }
   | { op: "remove_node"; nodeId: string }
   | { op: "move_node"; nodeId: string; newParentId: string; index: number }
+  | { op: "format_range"; nodeId: string; target: RangeTarget; prop: MarkProp; value: string }
+  | { op: "clear_range"; nodeId: string; target: RangeTarget; prop: MarkProp }
+  | { op: "set_marks"; nodeId: string; marks: Mark[] }
   | { op: "test"; nodeId: string; field: "text"; value: string };
 
 /**
@@ -43,6 +67,10 @@ export type Op =
  * values at parse time with a clear message.
  */
 const idStr = z.string().min(1);
+const RangeTargetSchema = z.union([
+  z.object({ from: z.number().int().nonnegative(), to: z.number().int().positive() }).strict(),
+  z.object({ match: z.string().min(1), nth: z.number().int().positive().optional() }).strict(),
+]);
 export const OpSchema: z.ZodType<Op> = z.discriminatedUnion("op", [
   z.object({ op: z.literal("set_text"), nodeId: idStr, value: z.string() }).strict(),
   z.object({ op: z.literal("set_content"), nodeId: idStr, content: ContentSchema }).strict(),
@@ -68,6 +96,19 @@ export const OpSchema: z.ZodType<Op> = z.discriminatedUnion("op", [
   z
     .object({ op: z.literal("move_node"), nodeId: idStr, newParentId: idStr, index: z.number().int() })
     .strict(),
+  z
+    .object({
+      op: z.literal("format_range"),
+      nodeId: idStr,
+      target: RangeTargetSchema,
+      prop: z.enum(MARK_PROPS),
+      value: z
+        .string()
+        .regex(TOKEN_REF, "format_range rejected: value must be a token ref (token-only invariant)"),
+    })
+    .strict(),
+  z.object({ op: z.literal("clear_range"), nodeId: idStr, target: RangeTargetSchema, prop: z.enum(MARK_PROPS) }).strict(),
+  z.object({ op: z.literal("set_marks"), nodeId: idStr, marks: z.array(MarkSchema) }).strict(),
   z.object({ op: z.literal("test"), nodeId: idStr, field: z.literal("text"), value: z.string() }).strict(),
 ]) as z.ZodType<Op>;
 
@@ -152,9 +193,41 @@ export function apply(deck: Deck, ops: Op[]): ApplyResult {
         case "set_text": {
           const { node } = need(draft, op.nodeId);
           const old = node.content?.text ?? "";
+          const oldContent = node.content ? (current(node.content) as Content) : undefined;
           if (!node.content) node.content = {};
           node.content.text = op.value;
-          inverse.push({ op: "set_text", nodeId: op.nodeId, value: old });
+          if (node.content.marks) {
+            // the string changed -> old character offsets are invalid; reset formatting.
+            delete node.content.marks;
+            inverse.push({ op: "set_content", nodeId: op.nodeId, content: oldContent ?? {} });
+          } else {
+            inverse.push({ op: "set_text", nodeId: op.nodeId, value: old });
+          }
+          break;
+        }
+        case "format_range":
+        case "clear_range": {
+          const { node } = need(draft, op.nodeId);
+          const text = node.content?.text ?? "";
+          const { from, to } = resolveRange(text, op.target, op.nodeId);
+          const old = node.content?.marks ? (current(node.content.marks) as Mark[]) : undefined;
+          if (!node.content) node.content = {};
+          const value = op.op === "format_range" ? op.value : null;
+          const next = setRangeStyle(text, old, from, to, op.prop, value);
+          if (next) node.content.marks = next;
+          else delete node.content.marks;
+          inverse.push({ op: "set_marks", nodeId: op.nodeId, marks: old ?? [] });
+          break;
+        }
+        case "set_marks": {
+          const { node } = need(draft, op.nodeId);
+          const text = node.content?.text ?? "";
+          const old = node.content?.marks ? (current(node.content.marks) as Mark[]) : undefined;
+          if (!node.content) node.content = {};
+          const next = normalizeMarks(text, op.marks);
+          if (next) node.content.marks = next;
+          else delete node.content.marks;
+          inverse.push({ op: "set_marks", nodeId: op.nodeId, marks: old ?? [] });
           break;
         }
         case "set_content": {

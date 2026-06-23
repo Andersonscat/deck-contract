@@ -148,3 +148,46 @@ describe("test guard op", () => {
     ).toThrow(/test failed/);
   });
 });
+
+describe("sub-text marks (word/letter level styling)", () => {
+  const titleId = "title_main";
+  const wordOf = (deck: ReturnType<typeof makeDeck>) =>
+    parseDeck(deck).slides[0]!.children![0]!.children![0]!.content!.text!.split(/\s+/)[0]!;
+
+  it("format_range by text match applies a token-only mark to just that word", () => {
+    const deck = parseDeck(makeDeck());
+    const word = deck.slides[0]!.children![0]!.children![0]!.content!.text!.split(/\s+/)[0]!;
+    const { deck: after } = apply(deck, [
+      { op: "format_range", nodeId: titleId, target: { match: word }, prop: "color", value: "token://color/accent" },
+    ]);
+    const marks = (after.slides[0]!.children![0]!.children![0]! as { content: { marks?: unknown[] } }).content.marks!;
+    expect(marks).toEqual([{ from: 0, to: word.length, style: { color: "token://color/accent" } }]);
+  });
+
+  it("rejects a raw (non-token) value (token-only invariant)", () => {
+    const deck = parseDeck(makeDeck());
+    expect(() =>
+      apply(deck, [{ op: "format_range", nodeId: titleId, target: { match: wordOf(makeDeck()) }, prop: "color", value: "#f00" }]),
+    ).toThrow(/token/);
+  });
+
+  it("inverse restores the unmarked text", () => {
+    const deck = parseDeck(makeDeck());
+    const word = wordOf(makeDeck());
+    const { deck: after, inverse } = apply(deck, [
+      { op: "format_range", nodeId: titleId, target: { match: word }, prop: "color", value: "token://color/accent" },
+    ]);
+    const { deck: back } = apply(after, inverse);
+    expect((back.slides[0]!.children![0]!.children![0]! as { content: { marks?: unknown } }).content.marks).toBeUndefined();
+  });
+
+  it("set_text on a marked node drops the now-invalid marks", () => {
+    const deck = parseDeck(makeDeck());
+    const word = wordOf(makeDeck());
+    const { deck: marked } = apply(deck, [
+      { op: "format_range", nodeId: titleId, target: { match: word }, prop: "color", value: "token://color/accent" },
+    ]);
+    const { deck: after } = apply(marked, [{ op: "set_text", nodeId: titleId, value: "Totally new text" }]);
+    expect((after.slides[0]!.children![0]!.children![0]! as { content: { marks?: unknown } }).content.marks).toBeUndefined();
+  });
+});

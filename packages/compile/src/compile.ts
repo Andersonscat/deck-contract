@@ -1,4 +1,5 @@
-import type { Deck, DeckNode, Frame, Theme } from "@deck/contract";
+import type { Deck, DeckNode, Frame, Mark, Theme } from "@deck/contract";
+import { normalizeMarks } from "@deck/contract";
 
 /**
  * compileHtml is PURE and side-effect-free (load-bearing, decision #3): no I/O,
@@ -122,12 +123,32 @@ function attrs(node: DeckNode): string {
   return ` data-cid="${esc(node.id)}" data-type="${esc(node.type)}"${roleAttr}${styleAttr}`;
 }
 
+/**
+ * Render text with optional sub-text marks. With no marks this is exactly esc(text) (same
+ * bytes as before). Marked ranges become <span style=token-css>; unmarked gaps stay bare
+ * text with NO wrapper and NO inter-span whitespace, so DOM textContent === content.text
+ * character-for-character (load-bearing for selection -> offset mapping in the viewer).
+ */
+function renderRuns(text: string, marks?: Mark[]): string {
+  const norm = normalizeMarks(text, marks);
+  if (!norm || !norm.length) return esc(text);
+  let out = "";
+  let i = 0;
+  for (const m of norm) {
+    if (m.from > i) out += esc(text.slice(i, m.from));
+    out += `<span style="${esc(styleToCss(m.style))}">${esc(text.slice(m.from, m.to))}</span>`;
+    i = m.to;
+  }
+  if (i < text.length) out += esc(text.slice(i));
+  return out;
+}
+
 function renderLeaf(node: DeckNode): string {
   const c = node.content ?? {};
   switch (node.type) {
     case "title":
     case "heading":
-      return `<h1${attrs(node)}>${esc(c.text ?? "")}</h1>`;
+      return `<h1${attrs(node)}>${renderRuns(c.text ?? "", c.marks)}</h1>`;
     case "bullet-list":
       return `<ul${attrs(node)}>${(c.items ?? [])
         .map((it) => `<li>${esc(it)}</li>`)
@@ -171,7 +192,7 @@ function renderLeaf(node: DeckNode): string {
     case "bar":
       return renderBar(node);
     default:
-      return `<div${attrs(node)}>${esc(c.text ?? "")}</div>`;
+      return `<div${attrs(node)}>${renderRuns(c.text ?? "", c.marks)}</div>`;
   }
 }
 

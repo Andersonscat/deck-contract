@@ -21,7 +21,12 @@ function preview(node: DeckNode): string {
 function outline(deck: Deck): string {
   const rows: string[] = [];
   for (const { node, slideId } of buildIndex(deck).values()) {
-    rows.push(`${node.id} [${node.type}${node.role ? "/" + node.role : ""}] slide=${slideId} "${preview(node)}"`);
+    const text = node.content?.text ?? "";
+    const marks = node.content?.marks ?? [];
+    const m = marks.length
+      ? `  marks:[${marks.map((k) => `${k.from}-${k.to} "${text.slice(k.from, k.to)}" ${JSON.stringify(k.style)}`).join("; ")}]`
+      : "";
+    rows.push(`${node.id} [${node.type}${node.role ? "/" + node.role : ""}] slide=${slideId} "${preview(node)}"${m}`);
   }
   return rows.join("\n");
 }
@@ -51,7 +56,9 @@ export async function runChat(
     "Ops:",
     '- {"op":"set_text","nodeId":ID,"value":STRING}   (only a node\'s .text — titles/headings)',
     '- {"op":"set_content","nodeId":ID,"content":{...}}   (replace content fields: text | items[] | value,label,delta | src,alt,caption)',
-    '- {"op":"set_token","nodeId":ID,"prop":"color"|"size"|"font"|...,"value":"token://ns/name"}',
+    '- {"op":"set_token","nodeId":ID,"prop":"color"|"size"|"font"|...,"value":"token://ns/name"}   (styles the WHOLE node)',
+    '- {"op":"format_range","nodeId":ID,"target":{"match":"word"}|{"from":N,"to":M},"prop":"color"|"font"|"size","value":"token://ns/name"}   (style ONE word/phrase/letter INSIDE a text)',
+    '- {"op":"clear_range","nodeId":ID,"target":{"match":"word"}|{"from":N,"to":M},"prop":"color"|"font"|"size"}   (remove a sub-text style)',
     '- {"op":"insert_node","parentId":ID,"index":N,"node":{...}}',
     '- {"op":"remove_node","nodeId":ID}',
     '- {"op":"move_node","nodeId":ID,"newParentId":ID,"index":N}',
@@ -66,7 +73,8 @@ export async function runChat(
     "- bar-chart (role chart): a CONTAINER whose children are individual `bar` components (one per column), in order. Words: график, диаграмма, chart, bar chart.",
     "- bar (role bar): ONE column of a bar-chart, individually addressable by its id. content.barValue is its height 0..100; style.color is its fill. \"the third bar / третий столбец\" = the 3rd `bar` child of that chart, in order. Edit ONE bar: set_token {prop:color} to recolour it, set_content {barValue:N} to change its height/size. Never edit the others unless asked.",
     "",
-    "Rules: style/colors only via set_token with theme tokens (never raw hex/px). Only edit nodes that exist.",
+    "Rules: style/colors only via set_token / format_range with theme tokens (never raw hex/px). Only edit nodes that exist.",
+    'To recolour/restyle ONE word, letter, or phrase INSIDE a text (e.g. "make the word build orange"), use format_range with target {match:"build"} — the server finds the character offsets itself; never compute offsets by hand. Use set_token only when the user means the WHOLE text node.',
     "Available theme tokens: " + tokens(deck),
     "All components:\n" + outline(deck),
     currentSlideId ? 'The user is viewing slide: ' + currentSlideId + ' (treat "this slide"/"here"/"эта страница" as it).' : "",

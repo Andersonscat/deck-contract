@@ -62,6 +62,25 @@ describe("compileHtml", () => {
     expect(html).not.toContain("<script>");
   });
 
+  it("renders sub-text marks as token-styled spans, leaving unmarked text bare", () => {
+    const deck = parseDeck(makeDeck());
+    const title = deck.slides[0]!.children![0]!.children![0]!;
+    title.content!.text = "Let's build it";
+    title.content!.marks = [{ from: 6, to: 11, style: { color: "token://color/accent" } }];
+    const { html } = compileHtml(deck);
+    expect(html).toContain('<span style="color:var(--color-accent)">build</span>');
+    // unmarked text stays bare (no wrapper, no inter-span whitespace) so DOM text === content.text
+    expect(html).toContain("Let's <span");
+    expect(html).toContain("</span> it");
+  });
+
+  it("with no marks, text compiles byte-identically to before", () => {
+    const a = parseDeck(makeDeck());
+    const b = parseDeck(makeDeck());
+    b.slides[0]!.children![0]!.children![0]!.content!.marks = undefined;
+    expect(compileHtml(a).html).toBe(compileHtml(b).html);
+  });
+
   it("renders a decomposed bar-chart as individually-addressable bars", () => {
     const deck = parseDeck(makeDeck());
     deck.slides[0]!.children!.push({
