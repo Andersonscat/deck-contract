@@ -85,6 +85,7 @@ export interface DeckNode {
   style?: Record<string, TokenRef>;
   layout?: z.infer<typeof LayoutSchema>;
   constraints?: z.infer<typeof ConstraintsSchema>;
+  textAlign?: "left" | "center" | "right";
   children?: DeckNode[];
 }
 
@@ -98,6 +99,7 @@ export const NodeSchema: z.ZodType<DeckNode> = z.lazy(() =>
       style: z.record(z.string(), TokenRefSchema).optional(),
       layout: LayoutSchema.optional(),
       constraints: ConstraintsSchema.optional(),
+      textAlign: z.enum(["left", "center", "right"]).optional(),
       children: z.array(NodeSchema).optional(),
     })
     .strict(),

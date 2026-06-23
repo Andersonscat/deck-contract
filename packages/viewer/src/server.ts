@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { watch, type FSWatcher } from "node:fs";
 import { parseDeck, type Deck, type DeckNode } from "@deck/contract";
 import { compileSlides } from "@deck/compile";
-import { apply, parseOps, cloneWithNewIds } from "@deck/core";
+import { apply, parseOps, cloneWithNewIds, buildIndex } from "@deck/core";
 import { CHROME_CSS, CLIENT_JS } from "./client.js";
 import { runChat } from "./chat.js";
 
@@ -131,7 +131,13 @@ export function createViewerServer(opts: ViewerOptions) {
       (apiKey ? "Describe a change — e.g. “make the title shorter” or “change the metric to 4x”." : "Chat disabled: no ANTHROPIC_API_KEY.") +
       "</div></div>" +
       '<form id="dc-chat-form"><textarea id="dc-chat-input" rows="2" placeholder="Ask to change a slide…"></textarea><button id="dc-chat-send" type="submit">↑</button></form>' +
-      "</div><script>" + CLIENT_JS + "</script></body></html>"
+      "</div><script>window.DC_THEME=" +
+      JSON.stringify({
+        font: Object.keys(deck.theme.font),
+        type: Object.keys(deck.theme.type),
+        color: Object.keys(deck.theme.color),
+      }) +
+      ";</script><script>" + CLIENT_JS + "</script></body></html>"
     );
   }
 
@@ -151,6 +157,11 @@ export function createViewerServer(opts: ViewerOptions) {
       if (req.method === "GET" && url === "/api/slides") {
         const { css, slides } = compileSlides(await readDeck());
         return json({ css, slides });
+      }
+      if (req.method === "GET" && url.startsWith("/api/node")) {
+        const id = new URL(url, "http://x").searchParams.get("id") ?? "";
+        const node = buildIndex(await readDeck()).get(id)?.node;
+        return node ? json(node) : json({ error: "not found" }, 404);
       }
       if (req.method === "GET" && url === "/api/events") {
         res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });

@@ -40,9 +40,15 @@ export const CHROME_CSS = `
 .dc-frame > section{ transform-origin:top left; }
 [data-cid]{ cursor:pointer; }
 .dc-selected{ outline:2px solid #ec5a13 !important; outline-offset:-2px; }
-#dc-tool{ position:fixed; display:none; gap:4px; background:#111; border-radius:9px; padding:4px; z-index:40; }
-#dc-tool button{ border:none; background:#2a2d34; color:#fff; height:30px; min-width:30px; padding:0 8px; border-radius:6px; cursor:pointer; font-size:13px; }
+#dc-tool{ position:fixed; display:none; align-items:center; flex-wrap:wrap; gap:6px; max-width:92vw; background:#111; border-radius:9px; padding:5px 8px; z-index:40; color:#cdd2da; font:11px -apple-system,Segoe UI,sans-serif; }
+#dc-tool button{ border:none; background:#2a2d34; color:#fff; height:28px; min-width:28px; padding:0 9px; border-radius:6px; cursor:pointer; font-size:12px; }
 #dc-tool button:hover{ background:#3a3e47; }
+#dc-tool select,#dc-tool input{ height:28px; border:1px solid #3a3e47; background:#2a2d34; color:#fff; border-radius:6px; font-size:12px; }
+#dc-tool input.dc-t-text{ width:160px; padding:0 8px; }
+#dc-tool select{ padding:0 4px; max-width:120px; }
+#dc-tool .dc-t-al{ display:flex; gap:2px; }
+#dc-tool .dc-t-al button{ min-width:28px; padding:0; }
+#dc-tool .dc-t-al button.on{ background:#ec5a13; }
 #dc-flash{ position:absolute; bottom:14px; left:14px; background:#111; color:#fff; padding:7px 12px; border-radius:6px; font-size:12px; opacity:0; transition:opacity .2s; z-index:30; }
 
 #dc-right{ width:330px; flex:none; display:flex; flex-direction:column; background:#fff; border-left:1px solid #d7dae0; }
@@ -84,7 +90,7 @@ export const CLIENT_JS = `
   function post(url,obj){ return fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(obj)}).then(function(r){ return r.json(); }); }
 
   // selection toolbar (slim, floats above the element)
-  function placeTool(){ if(!sel){ tool.style.display='none'; return; } var r=sel.getBoundingClientRect(); tool.style.left=Math.max(8,r.left)+'px'; tool.style.top=Math.max(8,r.top-38)+'px'; tool.style.display='flex'; }
+  function placeTool(){ if(!sel){ tool.style.display='none'; return; } tool.style.display='flex'; var r=sel.getBoundingClientRect(); var w=tool.offsetWidth||320; var left=Math.min(Math.max(8,r.left), window.innerWidth-w-8); tool.style.left=Math.max(8,left)+'px'; tool.style.top=Math.max(8,r.top-42)+'px'; }
   function setHead(t){ var h=document.getElementById('dc-chat-head'); if(h) h.textContent=t; }
   function deleteNode(cid){ post('/api/op',{ops:[{op:'remove_node',nodeId:cid}]}).then(function(res){ if(res&&res.error) flash('error: '+res.error); else flash('deleted'); }); }
   function clearSel(){ var n=document.querySelectorAll('.dc-selected'); for(var i=0;i<n.length;i++) n[i].classList.remove('dc-selected'); sel=null; tool.style.display='none'; setHead('AI assistant'); }
@@ -93,21 +99,50 @@ export const CLIENT_JS = `
     el.addEventListener('blur',finish,{once:true});
     el.addEventListener('keydown',function(k){ if(k.key==='Enter'){ k.preventDefault(); el.blur(); } });
   }
+  // contextual toolbar: which style props each component type exposes, and its text field
+  function styleProps(type){
+    if(type==='stat-callout') return {font:'valueFont',size:'valueSize',color:'valueColor'};
+    if(type==='image-caption'||type==='slide'||type==='container') return {};
+    return {font:'font',size:'size',color:'color'};
+  }
+  function contentField(type){
+    if(type==='stat-callout') return 'value';
+    if(type==='image-caption') return 'caption';
+    if(type==='bullet-list') return 'items';
+    if(type==='title'||type==='heading') return 'text';
+    return null;
+  }
+  function opts(list,curr){ var s=''; list=list||[]; for(var i=0;i<list.length;i++){ s+='<option value="'+list[i]+'"'+(list[i]===curr?' selected':'')+'>'+list[i]+'</option>'; } return s; }
+  function tokenKey(ref){ if(!ref) return ''; var m=/token:\\/\\/[a-z]+\\/([A-Za-z0-9-]+)/.exec(ref); return m?m[1]:''; }
+  function esc(s){ return (''+s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
   function select(el){
     clearSel(); el.classList.add('dc-selected'); sel=el;
-    var cid=el.getAttribute('data-cid'); var type=el.getAttribute('data-type'); var editable=(type==='title'||type==='heading');
-    setHead('AI · selected: ' + type);
-    tool.innerHTML=(editable?'<button data-act="edit" title="edit text">Edit</button>':'')+
-      '<button data-act="ai" title="set as AI target">AI</button>'+
-      '<button data-act="copy" title="copy id">Copy</button>'+
-      '<button data-act="delete" title="delete">Delete</button>';
-    tool.querySelectorAll('button').forEach(function(btn){ btn.onclick=function(ev){ ev.stopPropagation();
-      var a=btn.getAttribute('data-act');
-      if(a==='edit') editText(el);
-      if(a==='copy'){ try{ navigator.clipboard.writeText('@'+cid); }catch(e){} flash('copied @'+cid); }
-      if(a==='ai') post('/api/selection',{nodeId:cid}).then(function(){ flash('AI target = '+cid); });
-      if(a==='delete') deleteNode(cid);
-    }; });
+    var cid=el.getAttribute('data-cid'); var type=el.getAttribute('data-type');
+    setHead('AI · selected: '+type);
+    placeTool();
+    fetch('/api/node?id='+encodeURIComponent(cid)).then(function(r){ return r.json(); }).then(function(node){ if(sel!==el) return; buildTool(cid,type,(node&&node.id)?node:null); }).catch(function(){ if(sel===el) buildTool(cid,type,null); });
+  }
+  function buildTool(cid,type,node){
+    var sp=styleProps(type); var th=window.DC_THEME||{}; var st=(node&&node.style)||{}; var cf=contentField(type);
+    var html='';
+    if(cf){ var val=''; if(node&&node.content){ val = cf==='items' ? ((node.content.items||[]).join(' | ')) : (node.content[cf]||''); } html+='<input class="dc-t-text" placeholder="text" value="'+esc(val)+'">'; }
+    if(sp.font) html+='Font<select class="dc-t-f">'+opts(th.font,tokenKey(st[sp.font]))+'</select>';
+    if(sp.size) html+='Size<select class="dc-t-s">'+opts(th.type,tokenKey(st[sp.size]))+'</select>';
+    if(sp.color) html+='Color<select class="dc-t-c">'+opts(th.color,tokenKey(st[sp.color]))+'</select>';
+    if(cf==='text'||cf==='items'){ var al=(node&&node.textAlign)||'left'; html+='<span class="dc-t-al"><button data-al="left"'+(al==='left'?' class="on"':'')+'>L</button><button data-al="center"'+(al==='center'?' class="on"':'')+'>C</button><button data-al="right"'+(al==='right'?' class="on"':'')+'>R</button></span>'; }
+    html+='<button data-act="ai" title="set as AI target">AI</button>';
+    tool.innerHTML=html;
+    var tf=tool.querySelector('.dc-t-text');
+    if(tf) tf.addEventListener('change',function(){
+      if(cf==='text'){ post('/api/op',{ops:[{op:'set_text',nodeId:cid,value:tf.value}]}); }
+      else { var c={}; if(node&&node.content){ for(var k in node.content) c[k]=node.content[k]; } if(cf==='items'){ c.items=tf.value.split('|').map(function(s){ return s.trim(); }).filter(Boolean); } else { c[cf]=tf.value; } post('/api/op',{ops:[{op:'set_content',nodeId:cid,content:c}]}); }
+    });
+    var sf=tool.querySelector('.dc-t-f'); if(sf) sf.addEventListener('change',function(){ post('/api/op',{ops:[{op:'set_token',nodeId:cid,prop:sp.font,value:'token://font/'+sf.value}]}); });
+    var ss=tool.querySelector('.dc-t-s'); if(ss) ss.addEventListener('change',function(){ post('/api/op',{ops:[{op:'set_token',nodeId:cid,prop:sp.size,value:'token://type/'+ss.value}]}); });
+    var sclr=tool.querySelector('.dc-t-c'); if(sclr) sclr.addEventListener('change',function(){ post('/api/op',{ops:[{op:'set_token',nodeId:cid,prop:sp.color,value:'token://color/'+sclr.value}]}); });
+    var als=tool.querySelectorAll('.dc-t-al button'); for(var i=0;i<als.length;i++){ (function(btn){ btn.onclick=function(ev){ ev.stopPropagation(); post('/api/op',{ops:[{op:'set_align',nodeId:cid,value:btn.getAttribute('data-al')}]}); }; })(als[i]); }
+    var aib=tool.querySelector('[data-act="ai"]'); if(aib) aib.onclick=function(ev){ ev.stopPropagation(); post('/api/selection',{nodeId:cid}).then(function(){ flash('AI target = '+cid); }); };
     placeTool();
   }
 
@@ -115,8 +150,8 @@ export const CLIENT_JS = `
   stage.addEventListener('scroll',function(){ updateCurrent(); placeTool(); });
   for(var t=0;t<thumbs.length;t++){ (function(idx){ thumbs[idx].onclick=function(){ goTo(idx); }; })(t); }
   document.addEventListener('keydown',function(e){
-    if(e.target&&e.target.getAttribute&&e.target.getAttribute('contenteditable')==='true') return;
-    if(e.target&&e.target.id==='dc-chat-input') return;
+    var t=e.target, tag=t&&t.tagName;
+    if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(t&&t.getAttribute&&t.getAttribute('contenteditable')==='true')) return;
     if(e.key==='ArrowDown'){ e.preventDefault(); goTo(Math.min(cur+1,frames.length-1)); }
     if(e.key==='ArrowUp'){ e.preventDefault(); goTo(Math.max(cur-1,0)); }
     if((e.key==='Delete'||e.key==='Backspace')&&sel){ e.preventDefault(); deleteNode(sel.getAttribute('data-cid')); }

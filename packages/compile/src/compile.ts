@@ -93,7 +93,9 @@ function layoutToCss(node: DeckNode): string {
 }
 
 function attrs(node: DeckNode): string {
-  const style = [layoutToCss(node), styleToCss(node.style)].filter(Boolean).join(";");
+  const parts = [layoutToCss(node), styleToCss(node.style)];
+  if (node.textAlign) parts.push(`text-align:${node.textAlign}`);
+  const style = parts.filter(Boolean).join(";");
   const styleAttr = style ? ` style="${esc(style)}"` : "";
   const roleAttr = node.role ? ` data-role="${esc(node.role)}"` : "";
   // data-type/data-role let an interactive viewer know what was clicked.

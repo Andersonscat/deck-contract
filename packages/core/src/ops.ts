@@ -17,6 +17,7 @@ export type Op =
   | { op: "set_text"; nodeId: string; value: string }
   | { op: "set_content"; nodeId: string; content: Content }
   | { op: "set_token"; nodeId: string; prop: string; value: string }
+  | { op: "set_align"; nodeId: string; value: "left" | "center" | "right" }
   | { op: "remove_token"; nodeId: string; prop: string }
   | { op: "insert_node"; parentId: string; index: number; node: DeckNode }
   | { op: "remove_node"; nodeId: string }
@@ -43,6 +44,7 @@ export const OpSchema: z.ZodType<Op> = z.discriminatedUnion("op", [
         .regex(TOKEN_REF, "set_token rejected: value must be a token ref (token-only invariant)"),
     })
     .strict(),
+  z.object({ op: z.literal("set_align"), nodeId: idStr, value: z.enum(["left", "center", "right"]) }).strict(),
   z.object({ op: z.literal("remove_token"), nodeId: idStr, prop: z.string().min(1) }).strict(),
   z
     .object({ op: z.literal("insert_node"), parentId: idStr, index: z.number().int(), node: NodeSchema })
@@ -145,6 +147,13 @@ export function apply(deck: Deck, ops: Op[]): ApplyResult {
           const old = node.content ? (current(node.content) as Content) : {};
           node.content = op.content;
           inverse.push({ op: "set_content", nodeId: op.nodeId, content: old });
+          break;
+        }
+        case "set_align": {
+          const { node } = need(draft, op.nodeId);
+          const old = node.textAlign ?? "left";
+          node.textAlign = op.value;
+          inverse.push({ op: "set_align", nodeId: op.nodeId, value: old });
           break;
         }
         case "set_token": {
