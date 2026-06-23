@@ -290,7 +290,7 @@ export const CLIENT_JS = `
       dragNode.style.transform='translate('+sdx+'px,'+sdy+'px)';
       var c=cbox(); c.style.display='block'; c.textContent='x: '+Math.round(s.L)+' pt   y: '+Math.round(s.T)+' pt';
       var r=dragNode.getBoundingClientRect(); c.style.left=(r.left+r.width/2)+'px'; c.style.top=Math.max(8,r.top-40)+'px';
-      drawGuides(s);
+      drawGuides(dragNode,s);
       return;
     }
     if(!candEl) return;
@@ -307,25 +307,41 @@ export const CLIENT_JS = `
     var er=dragNode.getBoundingClientRect();
     dragHasFrame=(getComputedStyle(dragNode).position==='absolute');
     dragStart={ x:(er.left-frr.left)/dragSc/1280*100, y:(er.top-frr.top)/dragSc/720*100, w:er.width/dragSc/1280*100, h:er.height/dragSc/720*100, mx:downPt.x, my:downPt.y };
+    var tg=buildTargets(dragNode,fr,dragSc); vTargets=tg.vT; hTargets=tg.hT;
     dragNode.style.zIndex='6';
   }
-  // Smart alignment guides (phase 3a): snap the dragged box to the slide centre + edges.
-  // Everything is computed in canvas units (1280x720); the threshold is a screen-px value
-  // divided by the slide scale so the magnet feels identical at any zoom.
-  var VX=[0,640,1280], HY=[0,360,720], guidesEl=null;
-  function snapAxis(cands,targets,TH){ var best=null; for(var i=0;i<cands.length;i++){ for(var j=0;j<targets.length;j++){ var d=targets[j]-cands[i]; if(Math.abs(d)<=TH&&(!best||Math.abs(d)<Math.abs(best.delta))) best={delta:d,t:targets[j]}; } } return best; }
+  // Smart alignment guides (phase 3a + 3b): snap the active box per axis to the slide
+  // centre/edges AND to every other element's edges/centres. Everything is in canvas units
+  // (1280x720); the threshold is a screen-px value / scale so the magnet feels the same at
+  // any zoom. Each target carries a cross-axis extent [lo,hi] so its guide line spans only
+  // the involved boxes, not the whole slide. Slide/centre targets come first -> they win ties.
+  var vTargets=[], hTargets=[], guidesEl=null;
+  function buildTargets(activeEl,sec,scl){
+    var secr=sec.getBoundingClientRect();
+    var vT=[{v:640,lo:0,hi:720},{v:0,lo:0,hi:720},{v:1280,lo:0,hi:720}];
+    var hT=[{v:360,lo:0,hi:1280},{v:0,lo:0,hi:1280},{v:720,lo:0,hi:1280}];
+    var others=sec.querySelectorAll('[data-cid]');
+    for(var i=0;i<others.length;i++){ var o=others[i]; if(o===activeEl||o.tagName==='SECTION'||o.contains(activeEl)||activeEl.contains(o)) continue;
+      var r=o.getBoundingClientRect(); var L=(r.left-secr.left)/scl, T=(r.top-secr.top)/scl, W=r.width/scl, H=r.height/scl;
+      vT.push({v:L+W/2,lo:T,hi:T+H},{v:L,lo:T,hi:T+H},{v:L+W,lo:T,hi:T+H});
+      hT.push({v:T+H/2,lo:L,hi:L+W},{v:T,lo:L,hi:L+W},{v:T+H,lo:L,hi:L+W});
+    }
+    return { vT:vT, hT:hT };
+  }
+  function snapAxis(cands,targets,TH){ var best=null; for(var i=0;i<cands.length;i++){ for(var j=0;j<targets.length;j++){ var d=targets[j].v-cands[i]; if(Math.abs(d)<=TH&&(!best||Math.abs(d)<Math.abs(best.delta))) best={delta:d,t:targets[j]}; } } return best; }
+  function snapEdge(c,targets,TH){ var best=null; for(var j=0;j<targets.length;j++){ var d=Math.abs(targets[j].v-c); if(d<=TH&&(!best||d<best.d)) best={d:d,t:targets[j]}; } return best?best.t:null; }
   function snapDrag(e){
     var W=dragStart.w/100*1280, H=dragStart.h/100*720;
     var L=dragStart.x/100*1280+(e.clientX-dragStart.mx)/dragSc;
     var T=dragStart.y/100*720+(e.clientY-dragStart.my)/dragSc;
     var sx=null, sy=null;
-    if(!e.altKey){ var TH=6/dragSc; sx=snapAxis([L,L+W/2,L+W],VX,TH); if(sx) L+=sx.delta; sy=snapAxis([T,T+H/2,T+H],HY,TH); if(sy) T+=sy.delta; }
+    if(!e.altKey){ var TH=6/dragSc; sx=snapAxis([L,L+W/2,L+W],vTargets,TH); if(sx) L+=sx.delta; sy=snapAxis([T,T+H/2,T+H],hTargets,TH); if(sy) T+=sy.delta; }
     return { L:L, T:T, W:W, H:H, sx:sx, sy:sy };
   }
   function gbox(){ if(!guidesEl){ var c=document.createElement('div'); c.id='dc-guides'; var v=document.createElement('div'); v.className='dc-guide v'; var h=document.createElement('div'); h.className='dc-guide h'; c.appendChild(v); c.appendChild(h); document.body.appendChild(c); guidesEl={v:v,h:h}; } return guidesEl; }
-  function drawGuides(s){ var g=gbox(); var frr=dragNode.closest('section').getBoundingClientRect();
-    if(s.sx){ g.v.style.display='block'; g.v.style.left=(frr.left+s.sx.t*dragSc)+'px'; g.v.style.top=frr.top+'px'; g.v.style.height=(720*dragSc)+'px'; } else g.v.style.display='none';
-    if(s.sy){ g.h.style.display='block'; g.h.style.top=(frr.top+s.sy.t*dragSc)+'px'; g.h.style.left=frr.left+'px'; g.h.style.width=(1280*dragSc)+'px'; } else g.h.style.display='none';
+  function drawGuides(el,s){ var g=gbox(); var secr=el.closest('section').getBoundingClientRect(); var scl=secr.width/1280;
+    if(s.sx){ var loY=Math.min(s.sx.t.lo,s.T), hiY=Math.max(s.sx.t.hi,s.T+s.H); g.v.style.display='block'; g.v.style.left=(secr.left+s.sx.t.v*scl)+'px'; g.v.style.top=(secr.top+loY*scl)+'px'; g.v.style.height=((hiY-loY)*scl)+'px'; } else g.v.style.display='none';
+    if(s.sy){ var loX=Math.min(s.sy.t.lo,s.L), hiX=Math.max(s.sy.t.hi,s.L+s.W); g.h.style.display='block'; g.h.style.top=(secr.top+s.sy.t.v*scl)+'px'; g.h.style.left=(secr.left+loX*scl)+'px'; g.h.style.width=((hiX-loX)*scl)+'px'; } else g.h.style.display='none';
   }
   function hideGuides(){ if(guidesEl){ guidesEl.v.style.display='none'; guidesEl.h.style.display='none'; } }
   function endDrag(e){
@@ -367,6 +383,7 @@ export const CLIENT_JS = `
     var fr=sel.closest('section'); var frr=fr.getBoundingClientRect(); rsc=frr.width/1280;
     var rh=sel.getBoundingClientRect();
     startFrame={ x:(rh.left-frr.left)/rsc/1280*100, y:(rh.top-frr.top)/rsc/720*100, w:rh.width/rsc/1280*100, h:rh.height/rsc/720*100 };
+    var tg=buildTargets(sel,fr,rsc); vTargets=tg.vT; hTargets=tg.hT;
     resizeStart={ mx:e.clientX, my:e.clientY };
   }
   function doResize(e){
@@ -377,14 +394,23 @@ export const CLIENT_JS = `
     if(ml){ x=startFrame.x+dx; w=startFrame.w-dx; }
     if(mb) h=startFrame.h+dy;
     if(mt){ y=startFrame.y+dy; h=startFrame.h-dy; }
+    // snap the active edge to other elements' edges/centres + the slide
+    var sx=null, sy=null;
+    if(!e.altKey){ var TH=6/rsc;
+      if(mr){ var t=snapEdge((x+w)/100*1280,vTargets,TH); if(t){ sx={t:t}; w=t.v/1280*100-x; } }
+      else if(ml){ var tl=snapEdge(x/100*1280,vTargets,TH); if(tl){ sx={t:tl}; var nx=tl.v/1280*100; w=w+(x-nx); x=nx; } }
+      if(mb){ var tb=snapEdge((y+h)/100*720,hTargets,TH); if(tb){ sy={t:tb}; h=tb.v/720*100-y; } }
+      else if(mt){ var tt=snapEdge(y/100*720,hTargets,TH); if(tt){ sy={t:tt}; var ny=tt.v/720*100; h=h+(y-ny); y=ny; } }
+    }
     if(w<MIN){ if(ml) x=startFrame.x+startFrame.w-MIN; w=MIN; }
     if(h<MIN){ if(mt) y=startFrame.y+startFrame.h-MIN; h=MIN; }
     sel.style.position='absolute'; sel.style.left=round3(x)+'%'; sel.style.top=round3(y)+'%'; sel.style.width=round3(w)+'%'; sel.style.height=round3(h)+'%';
     resizeLast={ x:round3(x), y:round3(y), w:round3(w), h:round3(h) };
+    drawGuides(sel,{ L:x/100*1280, T:y/100*720, W:w/100*1280, H:h/100*720, sx:sx, sy:sy });
     positionHandles();
   }
   function endResize(){
-    resizing=false; document.body.style.userSelect='';
+    resizing=false; document.body.style.userSelect=''; hideGuides();
     if(resizeLast&&sel) op([{op:'set_frame',nodeId:sel.getAttribute('data-cid'),frame:resizeLast}]);
     resizeLast=null;
   }
