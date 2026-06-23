@@ -40,7 +40,7 @@ export const CHROME_CSS = `
 .dc-frame > section{ transform-origin:top left; }
 [data-cid]{ cursor:pointer; }
 .dc-selected{ outline:2px solid #ec5a13 !important; outline-offset:-2px; }
-#dc-topbar{ margin:12px 16px 6px; min-height:54px; flex:none; display:flex; align-items:center; gap:10px; padding:0 14px; background:#fff; border:1px solid #e6e8ee; border-radius:14px; overflow-x:auto; }
+#dc-topbar{ position:relative; z-index:50; margin:12px 16px 6px; min-height:54px; flex:none; display:flex; align-items:center; gap:10px; padding:0 14px; background:#fff; border:1px solid #e6e8ee; border-radius:14px; overflow:visible; }
 #dc-tool{ display:flex; align-items:center; gap:12px; font:13px -apple-system,Segoe UI,sans-serif; color:#5b606b; white-space:nowrap; }
 #dc-tool.dc-empty{ color:#9aa0aa; }
 #dc-tool .dc-lbl{ color:#9298a3; font-size:11px; }
