@@ -28,6 +28,7 @@ export const CHROME_CSS = `
 .dc-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .dc-el{ border:1px solid #e2e4e9; border-radius:10px; background:#fff; padding:0; cursor:pointer; overflow:hidden; text-align:center; }
 .dc-el:hover{ border-color:#ec5a13; }
+.dc-el.sel{ border:2px solid #ec5a13; }
 .dc-el .dc-prev{ background:#13151b; height:84px; display:flex; flex-direction:column; justify-content:center; align-items:flex-start; gap:5px; padding:14px; overflow:hidden; }
 .dc-el .dc-lbl{ display:block; padding:8px; font-size:12px; color:#333; }
 .dc-back{ display:inline-flex; align-items:center; gap:6px; border:none; background:none; color:#5b606b; font-size:12px; cursor:pointer; padding:0 0 10px; }
@@ -174,9 +175,9 @@ export const CLIENT_JS = `
     clearSel(); el.classList.add('dc-selected'); sel=el;
     var cid=el.getAttribute('data-cid'); var type=el.getAttribute('data-type');
     setHead('AI · selected: '+type);
-    if(VARIANTS[type]){ setTab('elements'); showVariants(type); }
+    if(VARIANTS[type]){ setTab('elements'); showVariants(type,null); }
     positionHandles();
-    fetch('/api/node?id='+encodeURIComponent(cid)).then(function(r){ return r.json(); }).then(function(node){ if(sel!==el) return; buildTool(cid,type,(node&&node.id)?node:null); }).catch(function(){ if(sel===el) buildTool(cid,type,null); });
+    fetch('/api/node?id='+encodeURIComponent(cid)).then(function(r){ return r.json(); }).then(function(node){ if(sel!==el) return; var n=(node&&node.id)?node:null; buildTool(cid,type,n); if(VARIANTS[type]) showVariants(type,n); }).catch(function(){ if(sel===el) buildTool(cid,type,null); });
   }
   function buildTool(cid,type,node){
     tool.className=''; tool.innerHTML='';
@@ -230,17 +231,22 @@ export const CLIENT_JS = `
     'image-caption':[ {label:'Caption muted',ops:{captionColor:'muted',captionSize:'caption'}}, {label:'Caption accent',ops:{captionColor:'accent',captionSize:'caption'}} ]
   };
   function propNs(p){ if(p==='size'||p.indexOf('Size')>=0) return 'type'; if(p==='font'||p.indexOf('Font')>=0) return 'font'; if(p==='radius') return 'radius'; return 'color'; }
-  function variantPreview(type,v){
-    var c='var(--color-'+(v.ops.color||v.ops.valueColor||v.ops.marker||v.ops.captionColor||'text')+')';
-    if(type==='stat-callout') return '<div style="font:800 24px/1 sans-serif;color:'+c+'">3x</div><div style="font-size:10px;color:var(--color-muted)">metric</div>';
-    if(type==='bullet-list'){ var dot='<span style="width:5px;height:5px;border-radius:50%;background:var(--color-'+(v.ops.marker||'accent')+');display:inline-block;margin-right:6px"></span>'; var ln='<div style="display:flex;align-items:center;margin:3px 0">'+dot+'<span style="height:5px;width:74px;background:#5a6172;border-radius:3px"></span></div>'; return ln+ln+ln; }
-    if(type==='image-caption') return '<div style="width:100%;height:42px;background:#3a4150;border-radius:6px"></div><div style="font-size:10px;margin-top:5px;color:'+c+'">caption</div>';
-    return '<div style="font:800 22px/1 sans-serif;color:'+c+'">Aa</div>';
+  function px(k){ var m={display:26,h1:22,h2:17,body:14,caption:12}; return m[k]||18; }
+  function esc2(s){ return (''+s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+  function trunc(s,n){ s=''+s; return s.length>n?s.slice(0,n-1)+'…':s; }
+  function variantPreview(type,v,node){
+    var c=(node&&node.content)||{};
+    if(type==='stat-callout'){ var col='var(--color-'+(v.ops.valueColor||'accent')+')'; return '<div style="font:800 '+px(v.ops.valueSize)+'px/1.05 sans-serif;color:'+col+'">'+esc2(trunc(c.value||'3x',8))+'</div><div style="font-size:10px;color:var(--color-muted)">'+esc2(trunc(c.label||'metric',12))+'</div>'; }
+    if(type==='bullet-list'){ var mk='var(--color-'+(v.ops.marker||'accent')+')'; var tc='var(--color-'+(v.ops.color||'text')+')'; var items=(c.items&&c.items.length)?c.items:['Item one','Item two','Item three']; var out=''; for(var i=0;i<Math.min(3,items.length);i++){ out+='<div style="display:flex;align-items:center;gap:5px;margin:2px 0"><span style="width:4px;height:4px;border-radius:50%;background:'+mk+';flex:none"></span><span style="font-size:'+Math.min(px(v.ops.size),12)+'px;color:'+tc+';white-space:nowrap;overflow:hidden">'+esc2(trunc(items[i],14))+'</span></div>'; } return out; }
+    if(type==='image-caption'){ var cc='var(--color-'+(v.ops.captionColor||'muted')+')'; return '<div style="width:100%;height:38px;background:#3a4150;border-radius:6px"></div><div style="font-size:10px;margin-top:5px;color:'+cc+'">'+esc2(trunc(c.caption||'caption',16))+'</div>'; }
+    var col2='var(--color-'+(v.ops.color||'text')+')'; return '<div style="font:800 '+px(v.ops.size)+'px/1.05 sans-serif;color:'+col2+'">'+esc2(trunc(c.text||'Aa',12))+'</div>';
   }
-  function showVariants(type){
+  function styleMatches(v,style){ var ks=Object.keys(v.ops); if(!ks.length) return false; for(var i=0;i<ks.length;i++){ if(tokenKey(style[ks[i]]||'')!==v.ops[ks[i]]) return false; } return true; }
+  function showVariants(type,node){
     if(!elementsPanel) return; var vs=VARIANTS[type]; if(!vs){ restoreElements(); return; }
+    var style=(node&&node.style)||{};
     var html='<button id="dc-el-back" class="dc-back"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>Elements</button><h4>'+cap(type)+' styles</h4><div class="dc-grid">';
-    for(var i=0;i<vs.length;i++){ html+='<button class="dc-el" data-variant="'+i+'"><div class="dc-prev">'+variantPreview(type,vs[i])+'</div><span class="dc-lbl">'+vs[i].label+'</span></button>'; }
+    for(var i=0;i<vs.length;i++){ var selCls=styleMatches(vs[i],style)?' sel':''; html+='<button class="dc-el'+selCls+'" data-variant="'+i+'"><div class="dc-prev">'+variantPreview(type,vs[i],node)+'</div><span class="dc-lbl">'+vs[i].label+'</span></button>'; }
     elementsPanel.innerHTML=html+'</div>';
     var back=document.getElementById('dc-el-back'); if(back) back.onclick=function(ev){ ev.stopPropagation(); restoreElements(); };
     var cards=[].slice.call(elementsPanel.querySelectorAll('[data-variant]'));
