@@ -241,6 +241,18 @@ export function createViewerServer(opts: ViewerOptions) {
           return json({ error: e instanceof Error ? e.message : String(e) });
         }
       }
+      if (req.method === "POST" && url === "/api/paste") {
+        const { node: pasted, parentId, index } = JSON.parse(await body(req));
+        try {
+          if (!pasted || typeof pasted !== "object") return json({ error: "paste: no node" });
+          const { node } = cloneWithNewIds(pasted as DeckNode); // fresh ids so it never collides with the source
+          await commit([{ op: "insert_node", parentId, index: index ?? 999, node }]);
+          const { slides } = compileSlides(await readDeck());
+          return json({ ok: true, ...hist(), slides, newId: node.id });
+        } catch (e) {
+          return json({ error: e instanceof Error ? e.message : String(e) });
+        }
+      }
       if (req.method === "POST" && url === "/api/insert_block") {
         const { blockId, parentId, index } = JSON.parse(await body(req));
         try {

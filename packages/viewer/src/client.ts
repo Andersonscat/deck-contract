@@ -204,6 +204,30 @@ export const CLIENT_JS = `
     },function(){ opInFlight--; forceRebuild(); });
   }
   function forceRebuild(){ fetch('/api/slides').then(function(r){ return r.json(); }).then(function(d){ if(d&&d.slides) applySlides(d.slides,true); }).catch(function(){}); }
+  // Copy / paste / duplicate an element. The copied node's subtree is held in a JS clipboard;
+  // paste clones it server-side with fresh ids and drops it on the current slide, offset (and
+  // cascaded on repeat) so it's visible. Cmd/Ctrl + C / V / D.
+  var clipboard=null, clipboardGeom=null, pasteN=0;
+  function doCopy(){ if(!sel) return; var cid=sel.getAttribute('data-cid');
+    var sec=sel.closest('section'), geom=null;
+    if(sec){ var secr=sec.getBoundingClientRect(), scl=secr.width/1280, r=sel.getBoundingClientRect();
+      geom={ x:round3((r.left-secr.left)/scl/1280*100), y:round3((r.top-secr.top)/scl/720*100), w:round3(r.width/scl/1280*100) }; }
+    fetch('/api/node?id='+encodeURIComponent(cid)).then(function(r){ return r.json(); }).then(function(n){ if(n&&n.id){ clipboard=n; clipboardGeom=geom; pasteN=0; flash('copied'); } }).catch(function(){});
+  }
+  function doPaste(){ if(!clipboard) return; var pid=curSlideId(); if(!pid) return; pasteN++; var off=3*pasteN;
+    var copy=JSON.parse(JSON.stringify(clipboard));
+    if(copy.frame){ copy.frame.x=round3((copy.frame.x||0)+off); copy.frame.y=round3((copy.frame.y||0)+off); }
+    else if(clipboardGeom){ copy.frame={ x:round3(clipboardGeom.x+off), y:round3(clipboardGeom.y+off), w:clipboardGeom.w }; } // match original width (no h -> no clipping)
+    else { copy.frame={ x:round3(6+off), y:round3(6+off) }; }
+    opInFlight++; opSeq++;
+    post('/api/paste',{node:copy,parentId:pid,index:999}).then(function(res){ opInFlight--;
+      if(res&&res.error){ flash('error: '+res.error); return; }
+      setHist(res); if(res.slides) applySlides(res.slides,true);
+      if(res.newId){ var nv=document.querySelector('#dc-stage [data-cid="'+res.newId+'"]'); if(nv) select(nv); }
+      flash('pasted');
+    },function(){ opInFlight--; });
+  }
+  function doDuplicate(){ if(!sel) return; var cid=sel.getAttribute('data-cid'); fetch('/api/node?id='+encodeURIComponent(cid)).then(function(r){ return r.json(); }).then(function(n){ if(n&&n.id){ clipboard=n; pasteN=0; doPaste(); } }).catch(function(){}); }
   function group(label,el){ var g=document.createElement('div'); g.className='dc-grp'; if(label){ var l=document.createElement('span'); l.className='dc-lbl'; l.textContent=label; g.appendChild(l); } g.appendChild(el); return g; }
   function makeDropdown(o){
     var wrap=document.createElement('div'); wrap.className='dc-dd';
@@ -293,6 +317,9 @@ export const CLIENT_JS = `
     var mod=e.metaKey||e.ctrlKey;
     if(mod&&(e.key==='z'||e.key==='Z')){ e.preventDefault(); if(e.shiftKey) doRedo(); else doUndo(); return; }
     if(mod&&(e.key==='y'||e.key==='Y')){ e.preventDefault(); doRedo(); return; }
+    if(mod&&(e.key==='c'||e.key==='C')){ if(sel){ e.preventDefault(); doCopy(); } return; }
+    if(mod&&(e.key==='v'||e.key==='V')){ if(clipboard){ e.preventDefault(); doPaste(); } return; }
+    if(mod&&(e.key==='d'||e.key==='D')){ if(sel){ e.preventDefault(); doDuplicate(); } return; }
     if(e.key==='ArrowDown'){ e.preventDefault(); goTo(Math.min(cur+1,frames.length-1)); }
     if(e.key==='ArrowUp'){ e.preventDefault(); goTo(Math.max(cur-1,0)); }
     if((e.key==='Delete'||e.key==='Backspace')&&sel){ e.preventDefault(); deleteNode(sel.getAttribute('data-cid')); }
