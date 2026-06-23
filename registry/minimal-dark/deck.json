@@ -1,0 +1,156 @@
+{
+  "spec": "deck-contract/1",
+  "id": "minimal_dark_sample",
+  "title": "Minimal Dark — sample pitch deck",
+  "theme": {
+    "color": {
+      "bg": "#0f1115",
+      "surface": "#171a21",
+      "text": "#f5f6f8",
+      "muted": "#9aa3b2",
+      "accent": "#ec5a13"
+    },
+    "font": {
+      "heading": "Inter, system-ui, sans-serif",
+      "body": "Inter, system-ui, sans-serif"
+    },
+    "type": {
+      "display": "72px",
+      "h1": "40px",
+      "h2": "26px",
+      "body": "18px",
+      "caption": "14px"
+    },
+    "space": { "xs": "6px", "sm": "10px", "md": "18px", "lg": "28px", "xl": "56px" },
+    "radius": { "md": "14px" }
+  },
+  "canvas": { "width": 1280, "height": 720 },
+  "slides": [
+    {
+      "id": "slide_title",
+      "type": "slide",
+      "role": "title",
+      "style": { "background": "token://color/bg" },
+      "layout": {
+        "direction": "column",
+        "gap": "token://space/md",
+        "align": "start",
+        "justify": "center",
+        "padding": "token://space/xl"
+      },
+      "children": [
+        {
+          "id": "title_hero",
+          "type": "title",
+          "role": "slide-title",
+          "content": { "text": "Acme — AI-native infrastructure" },
+          "style": { "color": "token://color/text", "font": "token://font/heading", "size": "token://type/display" },
+          "constraints": { "maxChars": 48, "overflow": "shrink-to-fit" }
+        },
+        {
+          "id": "title_sub",
+          "type": "heading",
+          "role": "subtitle",
+          "content": { "text": "Seed deck · 2026" },
+          "style": { "color": "token://color/muted", "font": "token://font/body", "size": "token://type/h2" }
+        }
+      ]
+    },
+    {
+      "id": "slide_metrics",
+      "type": "slide",
+      "role": "content",
+      "style": { "background": "token://color/bg" },
+      "layout": { "direction": "column", "gap": "token://space/lg", "padding": "token://space/xl" },
+      "children": [
+        {
+          "id": "metrics_title",
+          "type": "title",
+          "content": { "text": "Traction" },
+          "style": { "color": "token://color/text", "font": "token://font/heading", "size": "token://type/h1" }
+        },
+        {
+          "id": "metrics_row",
+          "type": "container",
+          "layout": { "direction": "row", "gap": "token://space/lg", "align": "start" },
+          "children": [
+            {
+              "id": "metric_arr",
+              "type": "stat-callout",
+              "content": { "value": "$1.2M", "label": "ARR", "delta": "+204%" },
+              "style": { "valueColor": "token://color/accent", "valueFont": "token://font/heading", "valueSize": "token://type/h1", "labelColor": "token://color/muted", "labelSize": "token://type/caption" }
+            },
+            {
+              "id": "metric_ret",
+              "type": "stat-callout",
+              "content": { "value": "92%", "label": "Net retention" },
+              "style": { "valueColor": "token://color/accent", "valueFont": "token://font/heading", "valueSize": "token://type/h1", "labelColor": "token://color/muted", "labelSize": "token://type/caption" }
+            },
+            {
+              "id": "metric_logos",
+              "type": "stat-callout",
+              "content": { "value": "2", "label": "Enterprise logos" },
+              "style": { "valueColor": "token://color/accent", "valueFont": "token://font/heading", "valueSize": "token://type/h1", "labelColor": "token://color/muted", "labelSize": "token://type/caption" }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "slide_why",
+      "type": "slide",
+      "role": "content",
+      "style": { "background": "token://color/bg" },
+      "layout": { "direction": "row", "gap": "token://space/xl", "padding": "token://space/xl" },
+      "children": [
+        {
+          "id": "why_col",
+          "type": "container",
+          "layout": { "direction": "column", "gap": "token://space/md", "sizing": { "width": "fill" } },
+          "children": [
+            {
+              "id": "why_title",
+              "type": "title",
+              "content": { "text": "Why now" },
+              "style": { "color": "token://color/text", "font": "token://font/heading", "size": "token://type/h1" }
+            },
+            {
+              "id": "why_bullets",
+              "type": "bullet-list",
+              "content": { "items": ["Agents finally edit structure, not pixels", "Inference rides the user's own subscription", "Open contract, not a closed app"] },
+              "style": { "color": "token://color/text", "marker": "token://color/accent", "size": "token://type/body" }
+            }
+          ]
+        },
+        {
+          "id": "why_image",
+          "type": "image-caption",
+          "content": { "src": "asset://images/diagram.png", "alt": "architecture", "caption": "Functional core / thin shell" },
+          "style": { "radius": "token://radius/md", "captionColor": "token://color/muted", "captionSize": "token://type/caption" },
+          "layout": { "sizing": { "width": "fill", "height": "fill" } }
+        }
+      ]
+    },
+    {
+      "id": "slide_close",
+      "type": "slide",
+      "role": "closing",
+      "style": { "background": "token://color/bg" },
+      "layout": { "direction": "column", "gap": "token://space/md", "justify": "center", "padding": "token://space/xl" },
+      "children": [
+        {
+          "id": "close_title",
+          "type": "title",
+          "content": { "text": "Let's build it" },
+          "style": { "color": "token://color/text", "font": "token://font/heading", "size": "token://type/display" }
+        },
+        {
+          "id": "close_contact",
+          "type": "heading",
+          "content": { "text": "founders@acme.co" },
+          "style": { "color": "token://color/accent", "font": "token://font/body", "size": "token://type/h2" }
+        }
+      ]
+    }
+  ]
+}

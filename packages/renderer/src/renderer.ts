@@ -109,6 +109,34 @@ export class LocalChromiumRenderer {
     }
   }
 
+  /** Export the whole deck to a single PDF, one slide per page, vector (live) text. */
+  async exportPdf(deck: Deck): Promise<Buffer> {
+    const browser = await this.browser();
+    const context = await browser.newContext();
+    await context.route("**", (route) => {
+      const url = route.request().url();
+      if (url.startsWith("data:") || url.startsWith("about:")) route.continue();
+      else route.abort();
+    });
+    const page = await context.newPage();
+    try {
+      const { html } = compileHtml(deck);
+      await page.setContent(html, { waitUntil: "load" });
+      await page.addStyleTag({
+        content: `@page{size:${deck.canvas.width}px ${deck.canvas.height}px;margin:0}
+body{margin:0}
+.slide{break-after:page;break-inside:avoid}`,
+      });
+      await page.evaluate(async () => {
+        await (document as unknown as { fonts: { ready: Promise<unknown> } }).fonts.ready;
+        await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+      });
+      return await page.pdf({ printBackground: true, preferCSSPageSize: true });
+    } finally {
+      await context.close();
+    }
+  }
+
   async close(): Promise<void> {
     if (this.browserP) {
       const b = await this.browserP;

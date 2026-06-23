@@ -46,6 +46,17 @@ describe("LocalChromiumRenderer", () => {
   );
 
   it(
+    "exports a PDF with vector text",
+    async () => {
+      const deck = parseDeck(makeDeck());
+      const pdf = await renderer.exportPdf(deck);
+      expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+      expect(pdf.length).toBeGreaterThan(1000);
+    },
+    60_000,
+  );
+
+  it(
     "detects overflow on an overloaded slide (the measurer actually works)",
     async () => {
       const deck = parseDeck(makeOverflowingDeck());

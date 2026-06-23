@@ -9,13 +9,16 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "preview": "tsx examples/preview.ts",
     "render": "tsx examples/render.ts",
-    "loop": "tsx examples/loop.ts"
+    "loop": "tsx examples/loop.ts",
+    "agent": "tsx examples/agent.ts"
   },
   "devDependencies": {
     "@deck/compile": "workspace:*",
     "@deck/contract": "workspace:*",
     "@deck/core": "workspace:*",
+    "@deck/loader": "workspace:*",
     "@deck/loop": "workspace:*",
+    "@deck/mcp-server": "workspace:*",
     "@deck/renderer": "workspace:*",
     "@types/node": "^22.10.0",
     "tsx": "^4.22.4",

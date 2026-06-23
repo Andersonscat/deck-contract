@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "deck-contract": {
+      "command": "npx",
+      "args": ["tsx", "packages/mcp-server/src/bin.ts"]
+    }
+  }
+}

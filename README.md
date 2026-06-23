@@ -33,6 +33,8 @@ about transport.
 | `@deck/compile`   | `compileHtml(deck)` — pure, deterministic deck → HTML/CSS        |
 | `@deck/renderer`  | `LocalChromiumRenderer` — headless Chromium → PNG + `issues[]` (overflow/out-of-bounds) |
 | `@deck/loop`      | render-and-check loop with monotone gate + anti-oscillation + bounded iters |
+| `@deck/loader`    | `FileTemplateSource` — resolve self-contained template packages from a folder/git |
+| `@deck/mcp-server`| 8 MCP tools over stdio (thin shell); handle-based state behind a `DeckStore` |
 
 Dependency rule: everything depends on `contract`; `contract` depends on nothing. The
 domain ("slide", "title") must never leak into `core`/`contract`.
@@ -54,7 +56,27 @@ pnpm test        # 38 tests: id stability, atomicity, inverse, token-only, deter
 pnpm preview     # compile the sample deck -> examples/out/preview.html
 pnpm render      # surgical edit -> headless Chromium -> examples/out/slide-*.png
 pnpm loop        # run the fix loop on an overflowing deck -> monotone descent + before/after PNGs
+pnpm agent       # drive the MCP tools as a model would -> examples/out/deck-*.png + deck.pdf
 ```
+
+## Use it in Claude Code / Cursor
+
+A project-scoped `.mcp.json` is included. From a client that supports MCP, point it at
+the stdio server:
+
+```jsonc
+{
+  "mcpServers": {
+    "deck-contract": { "command": "npx", "args": ["tsx", "packages/mcp-server/src/bin.ts"] }
+  }
+}
+```
+
+Then the model has 8 tools: `list_templates`, `load_template`, `get_outline`,
+`get_node`, `apply_patch`, `insert_block`, `render`, `export_deck`. A typical turn:
+`load_template` → `get_outline` → `apply_patch` (surgical edit) → `render` (see the
+PNG + any overflow issues) → fix → `export_deck` (PDF). Inference runs on the client's
+own model; this server only edits structure and renders locally.
 
 ## Status
 
@@ -63,4 +85,8 @@ pnpm loop        # run the fix loop on an overflowing deck -> monotone descent +
       deterministic overflow / out-of-bounds measurement, PNG screenshots
 - [x] **Day 3** — render-and-check loop (monotone gate, anti-oscillation, bounded iters);
       proven to converge on golden fixtures with a deterministic solver (406→192→48→0px)
-- [ ] **Day 4** — 7 MCP tools, PDF export, package loader, wire a real model over the loop
+- [x] **Day 4** — 8 MCP tools over stdio, PDF export, template loader + first `minimal-dark`
+      package, handle-based session state; full model-flow integration test green
+
+MVP complete: an AI can load a template, surgically edit one component, render and
+self-check for overflow, and export a PDF — all on the client's own model.

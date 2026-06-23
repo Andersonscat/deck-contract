@@ -1,0 +1,37 @@
+{
+  "id": "minimal-dark",
+  "name": "Minimal Dark",
+  "version": "0.1.0",
+  "domain": "presentation",
+  "spec": "deck-contract/1",
+  "blocks": {
+    "stat-callout": {
+      "id": "block_stat",
+      "type": "stat-callout",
+      "role": "key-metric",
+      "content": { "value": "0x", "label": "metric", "delta": "" },
+      "style": { "valueColor": "token://color/accent", "valueFont": "token://font/heading", "valueSize": "token://type/h1", "labelColor": "token://color/muted", "labelSize": "token://type/caption" }
+    },
+    "bullet-list": {
+      "id": "block_bullets",
+      "type": "bullet-list",
+      "role": "supporting-points",
+      "content": { "items": ["First point", "Second point", "Third point"] },
+      "style": { "color": "token://color/text", "marker": "token://color/accent", "size": "token://type/body" }
+    },
+    "quote": {
+      "id": "block_quote",
+      "type": "heading",
+      "role": "quote",
+      "content": { "text": "A short, memorable quote." },
+      "style": { "color": "token://color/text", "font": "token://font/heading", "size": "token://type/h2" }
+    },
+    "image-caption": {
+      "id": "block_image",
+      "type": "image-caption",
+      "role": "visual",
+      "content": { "src": "asset://images/placeholder.png", "alt": "image", "caption": "Caption" },
+      "style": { "radius": "token://radius/md", "captionColor": "token://color/muted", "captionSize": "token://type/caption" }
+    }
+  }
+}

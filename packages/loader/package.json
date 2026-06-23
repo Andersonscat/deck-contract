@@ -1,0 +1,12 @@
+{
+  "name": "@deck/loader",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@deck/contract": "workspace:*",
+    "zod": "^3.24.1"
+  }
+}
