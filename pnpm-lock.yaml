@@ -17,6 +17,9 @@ importers:
       '@deck/core':
         specifier: workspace:*
         version: link:packages/core
+      '@deck/loop':
+        specifier: workspace:*
+        version: link:packages/loop
       '@deck/renderer':
         specifier: workspace:*
         version: link:packages/renderer
@@ -59,6 +62,18 @@ importers:
       zod:
         specifier: ^3.24.1
         version: 3.25.76
+
+  packages/loop:
+    dependencies:
+      '@deck/contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@deck/core':
+        specifier: workspace:*
+        version: link:../core
+      '@deck/renderer':
+        specifier: workspace:*
+        version: link:../renderer
 
   packages/renderer:
     dependencies:

@@ -8,12 +8,14 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "preview": "tsx examples/preview.ts",
-    "render": "tsx examples/render.ts"
+    "render": "tsx examples/render.ts",
+    "loop": "tsx examples/loop.ts"
   },
   "devDependencies": {
     "@deck/compile": "workspace:*",
     "@deck/contract": "workspace:*",
     "@deck/core": "workspace:*",
+    "@deck/loop": "workspace:*",
     "@deck/renderer": "workspace:*",
     "@types/node": "^22.10.0",
     "tsx": "^4.22.4",

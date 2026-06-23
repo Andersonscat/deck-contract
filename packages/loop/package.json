@@ -1,0 +1,13 @@
+{
+  "name": "@deck/loop",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@deck/contract": "workspace:*",
+    "@deck/core": "workspace:*",
+    "@deck/renderer": "workspace:*"
+  }
+}
