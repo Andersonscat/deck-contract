@@ -85,7 +85,7 @@ export async function runChat(
       ? "The user has SELECTED this component — treat \"this\"/\"it\"/\"это\" and the bare noun (title/название/метрика…) as THIS node unless they clearly mean another:\n" +
         JSON.stringify(selectedNode)
       : "No component is selected — resolve the target from the components list by role on the current slide.",
-    'Reply with ONE JSON object and nothing else: {"reply": short message in the user\'s language, "ops": [ ... ]}. Use ops:[] if no edit is needed.',
+    'Reply with ONE JSON object and nothing else: {"reply": short message in English, "ops": [ ... ]}. Use ops:[] if no edit is needed.',
   ].join("\n");
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {

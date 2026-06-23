@@ -1,6 +1,6 @@
 /**
  * Canva-style editor chrome injected around the compiled slides:
- *   left  — wide rail + panels (Слайды / Элементы / Текст / Бренд), elements shown as
+ *   left  — wide rail + panels (Slides / Elements / Text / Brand), elements shown as
  *           visual cards
  *   center— a vertical scroll of slide cards; the card nearest center is the "current"
  *           slide (its id is sent to the AI). Selecting an element shows a slim floating
@@ -86,7 +86,8 @@ export const CLIENT_JS = `
   // selection toolbar (slim, floats above the element)
   function placeTool(){ if(!sel){ tool.style.display='none'; return; } var r=sel.getBoundingClientRect(); tool.style.left=Math.max(8,r.left)+'px'; tool.style.top=Math.max(8,r.top-38)+'px'; tool.style.display='flex'; }
   function setHead(t){ var h=document.getElementById('dc-chat-head'); if(h) h.textContent=t; }
-  function clearSel(){ var n=document.querySelectorAll('.dc-selected'); for(var i=0;i<n.length;i++) n[i].classList.remove('dc-selected'); sel=null; tool.style.display='none'; setHead('ИИ ассистент'); }
+  function deleteNode(cid){ post('/api/op',{ops:[{op:'remove_node',nodeId:cid}]}).then(function(res){ if(res&&res.error) flash('error: '+res.error); else flash('deleted'); }); }
+  function clearSel(){ var n=document.querySelectorAll('.dc-selected'); for(var i=0;i<n.length;i++) n[i].classList.remove('dc-selected'); sel=null; tool.style.display='none'; setHead('AI assistant'); }
   function editText(el){ el.setAttribute('contenteditable','true'); el.focus(); var cid=el.getAttribute('data-cid');
     function finish(){ el.removeAttribute('contenteditable'); var txt=(el.textContent||'').replace(/\\s+/g,' ').trim(); post('/api/op',{ops:[{op:'set_text',nodeId:cid,value:txt}]}).then(function(res){ if(res&&res.error) flash('error: '+res.error); }); }
     el.addEventListener('blur',finish,{once:true});
@@ -95,14 +96,17 @@ export const CLIENT_JS = `
   function select(el){
     clearSel(); el.classList.add('dc-selected'); sel=el;
     var cid=el.getAttribute('data-cid'); var type=el.getAttribute('data-type'); var editable=(type==='title'||type==='heading');
-    setHead('ИИ · выбрано: ' + type);
-    tool.innerHTML=(editable?'<button data-act="edit" title="изменить текст">✎</button>':'')+
-      '<button data-act="ai" title="цель для ИИ">AI</button><button data-act="copy" title="копировать id">⧉</button>';
+    setHead('AI · selected: ' + type);
+    tool.innerHTML=(editable?'<button data-act="edit" title="edit text">✎</button>':'')+
+      '<button data-act="ai" title="AI target">AI</button>'+
+      '<button data-act="copy" title="copy id">⧉</button>'+
+      '<button data-act="delete" title="delete">🗑</button>';
     tool.querySelectorAll('button').forEach(function(btn){ btn.onclick=function(ev){ ev.stopPropagation();
       var a=btn.getAttribute('data-act');
       if(a==='edit') editText(el);
       if(a==='copy'){ try{ navigator.clipboard.writeText('@'+cid); }catch(e){} flash('copied @'+cid); }
       if(a==='ai') post('/api/selection',{nodeId:cid}).then(function(){ flash('AI target = '+cid); });
+      if(a==='delete') deleteNode(cid);
     }; });
     placeTool();
   }
@@ -115,6 +119,7 @@ export const CLIENT_JS = `
     if(e.target&&e.target.id==='dc-chat-input') return;
     if(e.key==='ArrowDown'){ e.preventDefault(); goTo(Math.min(cur+1,frames.length-1)); }
     if(e.key==='ArrowUp'){ e.preventDefault(); goTo(Math.max(cur-1,0)); }
+    if(e.key==='Delete'&&sel){ e.preventDefault(); deleteNode(sel.getAttribute('data-cid')); }
   });
 
   // left rail tabs
@@ -126,7 +131,7 @@ export const CLIENT_JS = `
   }
   for(var i=0;i<tabs.length;i++){ (function(tb){ tb.onclick=function(){ setTab(tb.getAttribute('data-tab')); }; })(tabs[i]); }
 
-  // insert blocks (Элементы / Текст) into the current slide
+  // insert blocks (Elements / Text) into the current slide
   var blockBtns=[].slice.call(document.querySelectorAll('[data-block]'));
   for(var b=0;b<blockBtns.length;b++){ (function(btn){ btn.onclick=function(){ var bid=btn.getAttribute('data-block'); var pid=curSlideId(); if(!pid) return;
     post('/api/insert_block',{blockId:bid,parentId:pid,index:999}).then(function(res){ if(res&&res.error) flash('error: '+res.error); else flash('added '+bid); });
