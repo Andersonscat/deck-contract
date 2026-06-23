@@ -40,7 +40,7 @@ export const CHROME_CSS = `
 .dc-frame > section{ transform-origin:top left; }
 [data-cid]{ cursor:pointer; }
 .dc-selected{ outline:2px solid #ec5a13 !important; outline-offset:-2px; }
-#dc-topbar{ height:50px; flex:none; display:flex; align-items:center; gap:8px; padding:0 16px; background:#fff; border-bottom:1px solid #e2e4e9; overflow-x:auto; }
+#dc-topbar{ margin:12px 16px 6px; min-height:50px; flex:none; display:flex; align-items:center; gap:8px; padding:0 14px; background:#fff; border:1px solid #d7dae0; border-radius:12px; overflow-x:auto; }
 #dc-tool{ display:flex; align-items:center; gap:8px; font:12px -apple-system,Segoe UI,sans-serif; color:#5b606b; white-space:nowrap; }
 #dc-tool.dc-empty{ color:#9aa0aa; }
 #dc-tool .dc-lbl{ color:#9298a3; }
@@ -50,8 +50,8 @@ export const CHROME_CSS = `
 #dc-tool .dc-t-al button{ width:32px; height:30px; border:none; border-right:1px solid #eef0f2; background:#fff; color:#444; cursor:pointer; font-size:13px; }
 #dc-tool .dc-t-al button:last-child{ border-right:none; }
 #dc-tool .dc-t-al button.on{ background:#ec5a13; color:#fff; }
-#dc-tool button[data-act]{ height:30px; border:1px solid #d7dae0; background:#fff; color:#333; border-radius:7px; padding:0 12px; cursor:pointer; font-size:12px; }
-#dc-tool button[data-act]:hover{ background:#f3f4f6; }
+#dc-tool button[data-act],#dc-tool button[data-add]{ height:30px; border:1px solid #d7dae0; background:#fff; color:#333; border-radius:7px; padding:0 12px; cursor:pointer; font-size:12px; }
+#dc-tool button[data-act]:hover,#dc-tool button[data-add]:hover{ background:#f3f4f6; }
 #dc-flash{ position:absolute; bottom:14px; left:14px; background:#111; color:#fff; padding:7px 12px; border-radius:6px; font-size:12px; opacity:0; transition:opacity .2s; z-index:30; }
 
 #dc-right{ width:330px; flex:none; display:flex; flex-direction:column; background:#fff; border-left:1px solid #d7dae0; }
@@ -96,7 +96,18 @@ export const CLIENT_JS = `
   var TOOL_EMPTY='Select an element to edit it';
   function setHead(t){ var h=document.getElementById('dc-chat-head'); if(h) h.textContent=t; }
   function deleteNode(cid){ post('/api/op',{ops:[{op:'remove_node',nodeId:cid}]}).then(function(res){ if(res&&res.error) flash('error: '+res.error); else flash('deleted'); }); }
-  function clearSel(){ var n=document.querySelectorAll('.dc-selected'); for(var i=0;i<n.length;i++) n[i].classList.remove('dc-selected'); sel=null; setHead('AI assistant'); if(tool){ tool.className='dc-empty'; tool.textContent=TOOL_EMPTY; } }
+  function clearSel(){ var n=document.querySelectorAll('.dc-selected'); for(var i=0;i<n.length;i++) n[i].classList.remove('dc-selected'); sel=null; setHead('AI assistant'); buildDefaultTool(); }
+  // when nothing is selected the top bar still shows useful content (insert actions)
+  function buildDefaultTool(){
+    if(!tool) return;
+    tool.className='';
+    var adds=[['heading','Text'],['stat-callout','Metric'],['bullet-list','List'],['image-caption','Image']];
+    var html='<span class="dc-lbl">Insert</span>';
+    for(var i=0;i<adds.length;i++){ html+='<button data-add="'+adds[i][0]+'">'+adds[i][1]+'</button>'; }
+    tool.innerHTML=html;
+    var btns=tool.querySelectorAll('[data-add]');
+    for(var j=0;j<btns.length;j++){ (function(btn){ btn.onclick=function(ev){ ev.stopPropagation(); var pid=curSlideId(); if(!pid) return; post('/api/insert_block',{blockId:btn.getAttribute('data-add'),parentId:pid,index:999}).then(function(res){ if(res&&res.error) flash('error: '+res.error); else flash('added'); }); }; })(btns[j]); }
+  }
   function editText(el){ el.setAttribute('contenteditable','true'); el.focus(); var cid=el.getAttribute('data-cid');
     function finish(){ el.removeAttribute('contenteditable'); var txt=(el.textContent||'').replace(/\\s+/g,' ').trim(); post('/api/op',{ops:[{op:'set_text',nodeId:cid,value:txt}]}).then(function(res){ if(res&&res.error) flash('error: '+res.error); }); }
     el.addEventListener('blur',finish,{once:true});
@@ -213,7 +224,7 @@ export const CLIENT_JS = `
         frames[i].innerHTML=data.slides[i].html;
         if(thumbs[i]) thumbs[i].innerHTML='<span class="dc-no">'+(i+1)+'</span>'+stripIds(data.slides[i].html);
       }
-      fitAll(); sel=null; tool.style.display='none';
+      fitAll(); clearSel();
       if(prev){ var again=document.querySelector('#dc-stage [data-cid="'+prev+'"]'); if(again) select(again); }
     }).catch(function(){ location.reload(); });
   }
@@ -222,5 +233,6 @@ export const CLIENT_JS = `
   fitAll();
   var saved=parseInt(sessionStorage.getItem('dc-cur')||'0',10); if(saved>0&&frames[saved]) frames[saved].scrollIntoView({block:'center'});
   updateCurrent();
+  buildDefaultTool();
 })();
 `;
