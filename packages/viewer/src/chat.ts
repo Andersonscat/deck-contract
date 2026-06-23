@@ -57,20 +57,35 @@ export async function runChat(
   currentSlideId?: string,
   model = "claude-sonnet-4-6",
 ): Promise<ChatResult> {
+  const selectedNode = selection ? buildIndex(deck).get(selection.nodeId)?.node : undefined;
+
   const system = [
     "You edit a slide deck by returning JSON ops. Address every node by its stable id.",
     "Ops:",
-    '- {"op":"set_text","nodeId":ID,"value":STRING}',
+    '- {"op":"set_text","nodeId":ID,"value":STRING}   (only a node\'s .text — titles/headings)',
+    '- {"op":"set_content","nodeId":ID,"content":{...}}   (replace content fields: text | items[] | value,label,delta | src,alt,caption)',
     '- {"op":"set_token","nodeId":ID,"prop":"color"|"size"|"font"|...,"value":"token://ns/name"}',
     '- {"op":"insert_node","parentId":ID,"index":N,"node":{...}}',
     '- {"op":"remove_node","nodeId":ID}',
     '- {"op":"move_node","nodeId":ID,"newParentId":ID,"index":N}',
-    "Rules: style values MUST be theme tokens (never raw hex/px). Only edit nodes that exist.",
+    "",
+    "Component types and the words users use for them:",
+    "- title (role slide-title/title): the slide headline. Words: заголовок, название, title, headline. Edit: set_text.",
+    "- heading (role subtitle): a sub-heading. Words: подзаголовок, subtitle. Edit: set_text.",
+    "- heading (role heading/quote): secondary heading or quote text. Edit: set_text.",
+    "- bullet-list (role supporting-points): bullet points. Words: список, буллеты, list, points. Edit: set_content { items:[...] }.",
+    "- stat-callout (role key-metric): a big metric. Words: метрика, число, показатель, KPI. Edit: set_content { value, label, delta }.",
+    "- image-caption (role visual): image + caption. Words: картинка, изображение, image. Edit: set_content { src, alt, caption }.",
+    "",
+    "Rules: style/colors only via set_token with theme tokens (never raw hex/px). Only edit nodes that exist.",
     "Available theme tokens: " + tokens(deck),
-    "Current components:\n" + outline(deck),
-    currentSlideId ? "The user is currently viewing slide: " + currentSlideId + ' (treat "this slide"/"here" as this slide).' : "",
-    selection ? "The user has selected node: " + selection.nodeId + ' (treat "this"/"selected" as this node).' : "No node is selected.",
-    'Reply with ONE JSON object and nothing else: {"reply": short message to the user, "ops": [ ... ]}. Use ops:[] if no edit is needed.',
+    "All components:\n" + outline(deck),
+    currentSlideId ? 'The user is viewing slide: ' + currentSlideId + ' (treat "this slide"/"here"/"эта страница" as it).' : "",
+    selectedNode
+      ? "The user has SELECTED this component — treat \"this\"/\"it\"/\"это\" and the bare noun (title/название/метрика…) as THIS node unless they clearly mean another:\n" +
+        JSON.stringify(selectedNode)
+      : "No component is selected — resolve the target from the components list by role on the current slide.",
+    'Reply with ONE JSON object and nothing else: {"reply": short message in the user\'s language, "ops": [ ... ]}. Use ops:[] if no edit is needed.',
   ].join("\n");
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {

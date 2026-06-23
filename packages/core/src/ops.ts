@@ -1,6 +1,6 @@
 import { produce, current } from "immer";
 import { z } from "zod";
-import { NodeSchema, TOKEN_REF, type Deck, type DeckNode } from "@deck/contract";
+import { NodeSchema, ContentSchema, TOKEN_REF, type Content, type Deck, type DeckNode } from "@deck/contract";
 
 /**
  * Mutation layer. Ops address nodes by STABLE id (never by JSON Pointer / index),
@@ -15,6 +15,7 @@ export const SLIDES_PARENT = "@slides";
 
 export type Op =
   | { op: "set_text"; nodeId: string; value: string }
+  | { op: "set_content"; nodeId: string; content: Content }
   | { op: "set_token"; nodeId: string; prop: string; value: string }
   | { op: "remove_token"; nodeId: string; prop: string }
   | { op: "insert_node"; parentId: string; index: number; node: DeckNode }
@@ -31,6 +32,7 @@ export type Op =
 const idStr = z.string().min(1);
 export const OpSchema: z.ZodType<Op> = z.discriminatedUnion("op", [
   z.object({ op: z.literal("set_text"), nodeId: idStr, value: z.string() }).strict(),
+  z.object({ op: z.literal("set_content"), nodeId: idStr, content: ContentSchema }).strict(),
   z
     .object({
       op: z.literal("set_token"),
@@ -136,6 +138,13 @@ export function apply(deck: Deck, ops: Op[]): ApplyResult {
           if (!node.content) node.content = {};
           node.content.text = op.value;
           inverse.push({ op: "set_text", nodeId: op.nodeId, value: old });
+          break;
+        }
+        case "set_content": {
+          const { node } = need(draft, op.nodeId);
+          const old = node.content ? (current(node.content) as Content) : {};
+          node.content = op.content;
+          inverse.push({ op: "set_content", nodeId: op.nodeId, content: old });
           break;
         }
         case "set_token": {

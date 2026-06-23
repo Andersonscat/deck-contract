@@ -184,11 +184,12 @@ export function createViewerServer(opts: ViewerOptions) {
         return json({ ok: true });
       }
       if (req.method === "POST" && url === "/api/chat") {
-        const { message, currentSlideId } = JSON.parse(await body(req));
+        const { message, currentSlideId, selectedId } = JSON.parse(await body(req));
         if (!apiKey) return json({ reply: "AI chat disabled: set ANTHROPIC_API_KEY.", applied: 0 });
         try {
           const deck = await readDeck();
-          const { reply, ops } = await runChat(message, deck, await readSelection(), apiKey, currentSlideId);
+          const selection = selectedId ? { nodeId: selectedId } : await readSelection();
+          const { reply, ops } = await runChat(message, deck, selection, apiKey, currentSlideId);
           let applied = 0;
           if (ops.length) {
             const next = apply(deck, parseOps(ops)).deck;

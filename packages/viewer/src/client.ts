@@ -85,7 +85,8 @@ export const CLIENT_JS = `
 
   // selection toolbar (slim, floats above the element)
   function placeTool(){ if(!sel){ tool.style.display='none'; return; } var r=sel.getBoundingClientRect(); tool.style.left=Math.max(8,r.left)+'px'; tool.style.top=Math.max(8,r.top-38)+'px'; tool.style.display='flex'; }
-  function clearSel(){ var n=document.querySelectorAll('.dc-selected'); for(var i=0;i<n.length;i++) n[i].classList.remove('dc-selected'); sel=null; tool.style.display='none'; }
+  function setHead(t){ var h=document.getElementById('dc-chat-head'); if(h) h.textContent=t; }
+  function clearSel(){ var n=document.querySelectorAll('.dc-selected'); for(var i=0;i<n.length;i++) n[i].classList.remove('dc-selected'); sel=null; tool.style.display='none'; setHead('ИИ ассистент'); }
   function editText(el){ el.setAttribute('contenteditable','true'); el.focus(); var cid=el.getAttribute('data-cid');
     function finish(){ el.removeAttribute('contenteditable'); var txt=(el.textContent||'').replace(/\\s+/g,' ').trim(); post('/api/op',{ops:[{op:'set_text',nodeId:cid,value:txt}]}).then(function(res){ if(res&&res.error) flash('error: '+res.error); }); }
     el.addEventListener('blur',finish,{once:true});
@@ -94,6 +95,7 @@ export const CLIENT_JS = `
   function select(el){
     clearSel(); el.classList.add('dc-selected'); sel=el;
     var cid=el.getAttribute('data-cid'); var type=el.getAttribute('data-type'); var editable=(type==='title'||type==='heading');
+    setHead('ИИ · выбрано: ' + type);
     tool.innerHTML=(editable?'<button data-act="edit" title="изменить текст">✎</button>':'')+
       '<button data-act="ai" title="цель для ИИ">AI</button><button data-act="copy" title="копировать id">⧉</button>';
     tool.querySelectorAll('button').forEach(function(btn){ btn.onclick=function(ev){ ev.stopPropagation();
@@ -151,7 +153,8 @@ export const CLIENT_JS = `
   document.getElementById('dc-chat-form').addEventListener('submit',function(e){ e.preventDefault();
     var input=document.getElementById('dc-chat-input'); var msg=input.value.trim(); if(!msg) return;
     input.value=''; addMsg('user',msg); var pending=addMsg('sys','…');
-    post('/api/chat',{message:msg,currentSlideId:curSlideId()}).then(function(res){ pending.remove(); addMsg('ai',res.reply||'(no reply)'); if(res.applied){ flash('applied '+res.applied+' edit(s)'); } }).catch(function(err){ pending.remove(); addMsg('sys','error: '+err); });
+    var selId=sel?sel.getAttribute('data-cid'):null;
+    post('/api/chat',{message:msg,currentSlideId:curSlideId(),selectedId:selId}).then(function(res){ pending.remove(); addMsg('ai',res.reply||'(no reply)'); if(res.applied){ flash('applied '+res.applied+' edit(s)'); } }).catch(function(err){ pending.remove(); addMsg('sys','error: '+err); });
   });
 
   try{ var es=new EventSource('/api/events'); es.onmessage=function(){ location.reload(); }; }catch(e){}

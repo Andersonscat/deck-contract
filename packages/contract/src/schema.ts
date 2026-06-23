@@ -75,6 +75,7 @@ export const ContentSchema = z
     caption: z.string().optional(),
   })
   .strict();
+export type Content = z.infer<typeof ContentSchema>;
 
 export interface DeckNode {
   id: string;

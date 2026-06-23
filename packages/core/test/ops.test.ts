@@ -89,6 +89,7 @@ describe("inverse round-trip (free undo)", () => {
     const deck = parseDeck(makeDeck());
     const ops: Op[] = [
       { op: "set_text", nodeId: "title_main", value: "Totally new headline" },
+      { op: "set_content", nodeId: "metric_rev", content: { value: "9x", label: "new label", delta: "+800%" } },
       { op: "set_token", nodeId: "title_main", prop: "color", value: "token://color/accent" },
       { op: "move_node", nodeId: "metric_rev", newParentId: "slide_01", index: 0 },
       {
