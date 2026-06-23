@@ -390,24 +390,41 @@ export const CLIENT_JS = `
   }
   function hideDist(){ if(distEl) distEl.innerHTML=''; }
   function hideGuides(){ if(guidesEl){ guidesEl.v.style.display='none'; guidesEl.h.style.display='none'; } hideDist(); }
+  // When the first element on a slide is moved out of flow, every other leaf element would
+  // reflow (collapse together and overlap). To match Keynote/Canva, freeze all other leaves
+  // at their current positions (also make them absolute) so only the dragged one moves.
+  // Returns the set_frame ops; applies the same positions inline so there's no flash.
+  function freezeSiblings(activeEl){
+    var sec=activeEl.closest('section'); var secr=sec.getBoundingClientRect(); var scl=secr.width/1280;
+    var leaves=sec.querySelectorAll('[data-cid]'); var todo=[];
+    for(var i=0;i<leaves.length;i++){ var l=leaves[i];
+      if(l===activeEl||l.querySelector('[data-cid]')||getComputedStyle(l).position==='absolute') continue; // skip self, containers, already-framed
+      var r=l.getBoundingClientRect();
+      todo.push({ el:l, f:{ x:round3((r.left-secr.left)/scl/1280*100), y:round3((r.top-secr.top)/scl/720*100), w:round3(r.width/scl/1280*100), h:round3(r.height/scl/720*100) } });
+    }
+    var ops=[];
+    for(var j=0;j<todo.length;j++){ var t=todo[j]; t.el.style.position='absolute'; t.el.style.left=t.f.x+'%'; t.el.style.top=t.f.y+'%'; t.el.style.width=t.f.w+'%'; t.el.style.height=t.f.h+'%'; ops.push({op:'set_frame',nodeId:t.el.getAttribute('data-cid'),frame:t.f}); }
+    return ops;
+  }
   function endDrag(e){
     var s=snapDrag(e);
     var nx=round3(s.L/1280*100), ny=round3(s.T/720*100);
     var cid=dragNode.getAttribute('data-cid');
-    // Pin the element at its dropped position immediately (clear the transform, set the final
-    // absolute frame inline). It stays exactly where released and siblings reflow, so it no
-    // longer "jumps" when the soft-refresh re-renders.
+    // Freeze the other leaves BEFORE moving this one out of flow (captures their current rects).
+    var freezeOps=dragHasFrame?[]:freezeSiblings(dragNode);
+    // Pin the dragged element at its dropped position immediately (clear transform, set the
+    // final absolute frame inline) so it stays exactly where released.
     dragNode.style.transform=''; dragNode.style.zIndex='';
     dragNode.style.position='absolute'; dragNode.style.left=nx+'%'; dragNode.style.top=ny+'%';
     if(!dragHasFrame){ dragNode.style.width=round3(dragStart.w)+'%'; dragNode.style.height=round3(dragStart.h)+'%'; }
-    if(dragHasFrame) op([{op:'move_to',nodeId:cid,x:nx,y:ny}]);
-    else op([{op:'set_frame',nodeId:cid,frame:{x:nx,y:ny,w:round3(dragStart.w),h:round3(dragStart.h)}}]);
+    var dop=dragHasFrame?{op:'move_to',nodeId:cid,x:nx,y:ny}:{op:'set_frame',nodeId:cid,frame:{x:nx,y:ny,w:round3(dragStart.w),h:round3(dragStart.h)}};
+    op(freezeOps.concat([dop]));
     dragging=false; document.body.style.cursor=''; document.body.style.userSelect=''; if(coordEl) coordEl.style.display='none'; hideGuides();
   }
 
   // resize handles (8) around the selected element -> set_frame
   var handlesEl=null, handleDivs={}, HK=['nw','n','ne','e','se','s','sw','w'];
-  var resizing=false, rsc=1, startFrame=null, resizeHandle=null, resizeStart=null, resizeLast=null;
+  var resizing=false, rsc=1, startFrame=null, resizeHandle=null, resizeStart=null, resizeLast=null, resizeFreezeOps=[];
   function ensureHandles(){
     if(handlesEl) return;
     handlesEl=document.createElement('div'); handlesEl.id='dc-handles'; document.body.appendChild(handlesEl);
@@ -429,6 +446,14 @@ export const CLIENT_JS = `
     var fr=sel.closest('section'); var frr=fr.getBoundingClientRect(); rsc=frr.width/1280;
     var rh=sel.getBoundingClientRect();
     startFrame={ x:(rh.left-frr.left)/rsc/1280*100, y:(rh.top-frr.top)/rsc/720*100, w:rh.width/rsc/1280*100, h:rh.height/rsc/720*100 };
+    // First resize of an in-flow element: freeze the slide (siblings + this element) so nothing
+    // reflows when this element drops out of flow.
+    resizeFreezeOps=[];
+    if(getComputedStyle(sel).position!=='absolute'){
+      resizeFreezeOps=freezeSiblings(sel);
+      resizeFreezeOps.push({op:'set_frame',nodeId:sel.getAttribute('data-cid'),frame:{x:round3(startFrame.x),y:round3(startFrame.y),w:round3(startFrame.w),h:round3(startFrame.h)}});
+      sel.style.position='absolute'; sel.style.left=round3(startFrame.x)+'%'; sel.style.top=round3(startFrame.y)+'%'; sel.style.width=round3(startFrame.w)+'%'; sel.style.height=round3(startFrame.h)+'%';
+    }
     var tg=buildTargets(sel,fr,rsc); vTargets=tg.vT; hTargets=tg.hT; snapBoxes=tg.boxes;
     resizeStart={ mx:e.clientX, my:e.clientY };
   }
@@ -460,8 +485,10 @@ export const CLIENT_JS = `
   }
   function endResize(){
     resizing=false; document.body.style.userSelect=''; hideGuides();
-    if(resizeLast&&sel) op([{op:'set_frame',nodeId:sel.getAttribute('data-cid'),frame:resizeLast}]);
-    resizeLast=null;
+    var ops=resizeFreezeOps.slice();
+    if(resizeLast&&sel) ops.push({op:'set_frame',nodeId:sel.getAttribute('data-cid'),frame:resizeLast});
+    if(ops.length) op(ops);
+    resizeLast=null; resizeFreezeOps=[];
   }
 
   // close any open custom dropdown when clicking elsewhere
