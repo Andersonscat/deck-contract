@@ -27,7 +27,8 @@ describe("viewer server", () => {
     const html = await (await fetch(base + "/")).text();
     expect(html).toContain('data-cid="title_main"');
     expect(html).toContain('data-type="title"');
-    expect(html).toContain('id="dc-panel"'); // chrome injected
+    expect(html).toContain('id="dc-stage"'); // editor chrome injected
+    expect(html).toContain('id="dc-chat-form"'); // AI chat present
     expect(html).toContain("set_text"); // client editing wired
   });
 

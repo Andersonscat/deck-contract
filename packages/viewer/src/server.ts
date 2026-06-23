@@ -33,6 +33,17 @@ const LABELS: Record<string, string> = {
 const ELEMENT_BLOCKS = ["stat-callout", "bullet-list", "quote", "image-caption"];
 const TEXT_BLOCKS = ["heading", "subtitle"];
 
+const BULLET_ROW =
+  '<div style="display:flex;gap:6px;align-items:center"><span style="width:5px;height:5px;border-radius:50%;background:var(--color-accent)"></span><span style="height:5px;width:74px;background:#5a6172;border-radius:3px"></span></div>';
+const PREVIEW: Record<string, string> = {
+  "stat-callout": '<div style="font:700 26px/1 sans-serif;color:var(--color-accent)">3×</div><div style="font-size:10px;color:var(--color-muted)">метрика</div>',
+  "bullet-list": BULLET_ROW + BULLET_ROW + BULLET_ROW,
+  quote: '<div style="font:700 32px/1 Georgia,serif;color:var(--color-accent)">“</div><div style="height:6px;width:84px;background:#5a6172;border-radius:3px;margin-top:2px"></div>',
+  "image-caption": '<div style="width:100%;height:50px;background:#3a4150;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#8b93a4;font-size:22px">▧</div>',
+  heading: '<div style="font:800 22px/1 sans-serif;color:var(--color-text)">Заголовок</div>',
+  subtitle: '<div style="font:600 15px/1 sans-serif;color:var(--color-muted)">Подзаголовок</div>',
+};
+
 function body(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     let d = "";
@@ -82,9 +93,17 @@ export function createViewerServer(opts: ViewerOptions) {
           '<span class="dc-no">' + (i + 1) + "</span>" + strip(s.html) + "</button>",
       )
       .join("");
-    const blockBtns = (ids: string[]) =>
-      ids.filter((id) => blocks[id]).map((id) => '<button class="dc-block" data-block="' + id + '">' + (LABELS[id] ?? id) + "</button>").join("") ||
-      '<div class="dc-note" style="color:#9298a3;font-size:12px">no blocks loaded</div>';
+    const elGrid = (ids: string[]) => {
+      const cards = ids
+        .filter((id) => blocks[id])
+        .map(
+          (id) =>
+            '<button class="dc-el" data-block="' + id + '"><div class="dc-prev">' +
+            (PREVIEW[id] ?? "") + '</div><span class="dc-lbl">' + (LABELS[id] ?? id) + "</span></button>",
+        )
+        .join("");
+      return cards ? '<div class="dc-grid">' + cards + "</div>" : '<div style="color:#9298a3;font-size:12px">no blocks loaded</div>';
+    };
     const swatches = Object.keys(deck.theme.color)
       .map((k) => '<button class="dc-swatch" data-token="token://color/' + k + '" title="' + k + '" style="background:var(--color-' + k + ')"></button>')
       .join("");
@@ -99,13 +118,13 @@ export function createViewerServer(opts: ViewerOptions) {
       '<button class="dc-tab" data-tab="brand"><span class="dc-ico">✦</span>Бренд</button>' +
       '</div><div class="dc-panels">' +
       '<div class="dc-panel2 dc-on" data-panel="slides"><h4>Слайды</h4>' + thumbs + "</div>" +
-      '<div class="dc-panel2" data-panel="elements"><h4>Элементы</h4>' + blockBtns(ELEMENT_BLOCKS) + "</div>" +
-      '<div class="dc-panel2" data-panel="text"><h4>Текст</h4>' + blockBtns(TEXT_BLOCKS) + "</div>" +
+      '<div class="dc-panel2" data-panel="elements"><h4>Элементы</h4>' + elGrid(ELEMENT_BLOCKS) + "</div>" +
+      '<div class="dc-panel2" data-panel="text"><h4>Текст</h4>' + elGrid(TEXT_BLOCKS) + "</div>" +
       '<div class="dc-panel2" data-panel="brand"><h4>Цвета темы</h4><div class="dc-swatches">' + swatches + "</div></div>" +
       "</div></div>" +
       '<div id="dc-center">' +
       '<div id="dc-stage">' + frames + "</div>" +
-      '<div id="dc-panel">click an element to select it</div><div id="dc-flash"></div>' +
+      '<div id="dc-tool"></div><div id="dc-flash"></div>' +
       "</div>" +
       '<div id="dc-right"><div id="dc-chat-head">ИИ ассистент</div>' +
       '<div id="dc-chat"><div class="dc-msg sys">' +
