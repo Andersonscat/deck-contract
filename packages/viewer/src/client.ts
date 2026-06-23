@@ -46,6 +46,10 @@ export const CHROME_CSS = `
 #dc-hover{ position:fixed; pointer-events:none; z-index:35; display:none; border:2px solid rgba(74,108,247,.55); border-radius:3px; }
 #dc-hover.drop{ border-color:#ec5a13; background:rgba(236,90,19,.08); }
 #dc-coord{ position:fixed; pointer-events:none; z-index:60; display:none; background:#1c1f26; color:#fff; font:12px/1 -apple-system,Segoe UI,sans-serif; padding:8px 12px; border-radius:9px; white-space:nowrap; transform:translateX(-50%); }
+#dc-guides{ position:fixed; left:0; top:0; pointer-events:none; z-index:37; }
+.dc-guide{ position:fixed; display:none; background:#ff2d6e; }
+.dc-guide.v{ width:2px; }
+.dc-guide.h{ height:2px; }
 #dc-handles{ position:fixed; left:0; top:0; pointer-events:none; z-index:38; display:none; }
 #dc-handles.on{ display:block; }
 .dc-h{ position:fixed; width:10px; height:10px; background:#fff; border:1.5px solid #4a6cf7; border-radius:2px; pointer-events:auto; }
@@ -281,12 +285,12 @@ export const CLIENT_JS = `
   document.addEventListener('mousemove',function(e){
     if(resizing){ doResize(e); return; }
     if(dragging){
-      var dx=e.clientX-dragStart.mx, dy=e.clientY-dragStart.my;
-      dragNode.style.transform='translate('+dx+'px,'+dy+'px)';
-      var xpt=Math.round((dragStart.x+dx/dragSc/1280*100)/100*1280);
-      var ypt=Math.round((dragStart.y+dy/dragSc/720*100)/100*720);
-      var c=cbox(); c.style.display='block'; c.textContent='x: '+xpt+' pt   y: '+ypt+' pt';
+      var s=snapDrag(e);
+      var sdx=(s.L-dragStart.x/100*1280)*dragSc, sdy=(s.T-dragStart.y/100*720)*dragSc;
+      dragNode.style.transform='translate('+sdx+'px,'+sdy+'px)';
+      var c=cbox(); c.style.display='block'; c.textContent='x: '+Math.round(s.L)+' pt   y: '+Math.round(s.T)+' pt';
       var r=dragNode.getBoundingClientRect(); c.style.left=(r.left+r.width/2)+'px'; c.style.top=Math.max(8,r.top-40)+'px';
+      drawGuides(s);
       return;
     }
     if(!candEl) return;
@@ -296,20 +300,47 @@ export const CLIENT_JS = `
   function startDrag(){
     dragging=true; dragNode=candEl; dragged=true; hideBox(); hideHandles(); document.body.style.cursor='grabbing';
     document.body.style.userSelect='none'; var sg=window.getSelection&&window.getSelection(); if(sg&&sg.removeAllRanges) sg.removeAllRanges();
-    var fr=dragNode.closest('.dc-frame'); var frr=fr.getBoundingClientRect(); dragSc=frr.width/1280;
+    // Coordinate origin = the slide <section> (the absolute-positioning containing block,
+    // because it carries transform:scale). Using .dc-frame here was the latent bug: the frame
+    // and the section don't share a top edge, so committed % didn't match the rendered position.
+    var fr=dragNode.closest('section'); var frr=fr.getBoundingClientRect(); dragSc=frr.width/1280;
     var er=dragNode.getBoundingClientRect();
     dragHasFrame=(getComputedStyle(dragNode).position==='absolute');
     dragStart={ x:(er.left-frr.left)/dragSc/1280*100, y:(er.top-frr.top)/dragSc/720*100, w:er.width/dragSc/1280*100, h:er.height/dragSc/720*100, mx:downPt.x, my:downPt.y };
     dragNode.style.zIndex='6';
   }
+  // Smart alignment guides (phase 3a): snap the dragged box to the slide centre + edges.
+  // Everything is computed in canvas units (1280x720); the threshold is a screen-px value
+  // divided by the slide scale so the magnet feels identical at any zoom.
+  var VX=[0,640,1280], HY=[0,360,720], guidesEl=null;
+  function snapAxis(cands,targets,TH){ var best=null; for(var i=0;i<cands.length;i++){ for(var j=0;j<targets.length;j++){ var d=targets[j]-cands[i]; if(Math.abs(d)<=TH&&(!best||Math.abs(d)<Math.abs(best.delta))) best={delta:d,t:targets[j]}; } } return best; }
+  function snapDrag(e){
+    var W=dragStart.w/100*1280, H=dragStart.h/100*720;
+    var L=dragStart.x/100*1280+(e.clientX-dragStart.mx)/dragSc;
+    var T=dragStart.y/100*720+(e.clientY-dragStart.my)/dragSc;
+    var sx=null, sy=null;
+    if(!e.altKey){ var TH=6/dragSc; sx=snapAxis([L,L+W/2,L+W],VX,TH); if(sx) L+=sx.delta; sy=snapAxis([T,T+H/2,T+H],HY,TH); if(sy) T+=sy.delta; }
+    return { L:L, T:T, W:W, H:H, sx:sx, sy:sy };
+  }
+  function gbox(){ if(!guidesEl){ var c=document.createElement('div'); c.id='dc-guides'; var v=document.createElement('div'); v.className='dc-guide v'; var h=document.createElement('div'); h.className='dc-guide h'; c.appendChild(v); c.appendChild(h); document.body.appendChild(c); guidesEl={v:v,h:h}; } return guidesEl; }
+  function drawGuides(s){ var g=gbox(); var frr=dragNode.closest('section').getBoundingClientRect();
+    if(s.sx){ g.v.style.display='block'; g.v.style.left=(frr.left+s.sx.t*dragSc)+'px'; g.v.style.top=frr.top+'px'; g.v.style.height=(720*dragSc)+'px'; } else g.v.style.display='none';
+    if(s.sy){ g.h.style.display='block'; g.h.style.top=(frr.top+s.sy.t*dragSc)+'px'; g.h.style.left=frr.left+'px'; g.h.style.width=(1280*dragSc)+'px'; } else g.h.style.display='none';
+  }
+  function hideGuides(){ if(guidesEl){ guidesEl.v.style.display='none'; guidesEl.h.style.display='none'; } }
   function endDrag(e){
-    var nx=round3(dragStart.x+(e.clientX-dragStart.mx)/dragSc/1280*100);
-    var ny=round3(dragStart.y+(e.clientY-dragStart.my)/dragSc/720*100);
+    var s=snapDrag(e);
+    var nx=round3(s.L/1280*100), ny=round3(s.T/720*100);
     var cid=dragNode.getAttribute('data-cid');
+    // Pin the element at its dropped position immediately (clear the transform, set the final
+    // absolute frame inline). It stays exactly where released and siblings reflow, so it no
+    // longer "jumps" when the soft-refresh re-renders.
+    dragNode.style.transform=''; dragNode.style.zIndex='';
+    dragNode.style.position='absolute'; dragNode.style.left=nx+'%'; dragNode.style.top=ny+'%';
+    if(!dragHasFrame){ dragNode.style.width=round3(dragStart.w)+'%'; dragNode.style.height=round3(dragStart.h)+'%'; }
     if(dragHasFrame) op([{op:'move_to',nodeId:cid,x:nx,y:ny}]);
     else op([{op:'set_frame',nodeId:cid,frame:{x:nx,y:ny,w:round3(dragStart.w),h:round3(dragStart.h)}}]);
-    dragging=false; document.body.style.cursor=''; document.body.style.userSelect=''; if(coordEl) coordEl.style.display='none';
-    // transform stays until soft-refresh replaces the element at its new absolute position
+    dragging=false; document.body.style.cursor=''; document.body.style.userSelect=''; if(coordEl) coordEl.style.display='none'; hideGuides();
   }
 
   // resize handles (8) around the selected element -> set_frame
@@ -333,7 +364,7 @@ export const CLIENT_JS = `
   function startResize(k,e){
     if(!sel) return;
     resizing=true; dragged=true; resizeHandle=k; document.body.style.userSelect='none';
-    var fr=sel.closest('.dc-frame'); var frr=fr.getBoundingClientRect(); rsc=frr.width/1280;
+    var fr=sel.closest('section'); var frr=fr.getBoundingClientRect(); rsc=frr.width/1280;
     var rh=sel.getBoundingClientRect();
     startFrame={ x:(rh.left-frr.left)/rsc/1280*100, y:(rh.top-frr.top)/rsc/720*100, w:rh.width/rsc/1280*100, h:rh.height/rsc/720*100 };
     resizeStart={ mx:e.clientX, my:e.clientY };
@@ -388,6 +419,7 @@ export const CLIENT_JS = `
   // Soft re-render: patch the slide DOM in place instead of reloading the page, so
   // scroll position, the selection, the open panel, and the chat history all survive.
   function stripIds(h){ return h.replace(/ data-cid="[^"]*"/g,'').replace(/ data-type="[^"]*"/g,'').replace(/ data-role="[^"]*"/g,''); }
+  var lastSlideHtml=[];
   function softRefresh(){
     fetch('/api/slides').then(function(r){ return r.json(); }).then(function(data){
       if(!data.slides || data.slides.length!==frames.length){ location.reload(); return; }
@@ -395,15 +427,22 @@ export const CLIENT_JS = `
       var prev=sel?sel.getAttribute('data-cid'):null;
       var editing=document.querySelector('#dc-stage [contenteditable="true"]');
       if(editing||dragging||resizing) return; // don't clobber an in-progress text edit / drag / resize
+      // Only re-render slides whose HTML actually changed, so a single edit doesn't rebuild
+      // every slide (that full rebuild is what felt like a full page reload).
+      var changed=false;
       for(var i=0;i<frames.length;i++){
+        if(lastSlideHtml[i]===data.slides[i].html) continue;
+        changed=true; lastSlideHtml[i]=data.slides[i].html;
         frames[i].innerHTML=data.slides[i].html;
         if(thumbs[i]) thumbs[i].innerHTML='<span class="dc-no">'+(i+1)+'</span>'+stripIds(data.slides[i].html);
       }
+      if(!changed){ refreshHist(); return; }
       fitAll(); clearSel();
       if(prev){ var again=document.querySelector('#dc-stage [data-cid="'+prev+'"]'); if(again) select(again); }
       refreshHist();
     }).catch(function(){ location.reload(); });
   }
+  fetch('/api/slides').then(function(r){ return r.json(); }).then(function(d){ if(d&&d.slides) for(var i=0;i<d.slides.length;i++) lastSlideHtml[i]=d.slides[i].html; }).catch(function(){});
   try{ var es=new EventSource('/api/events'); es.onmessage=function(){ softRefresh(); }; }catch(e){}
   setTab(sessionStorage.getItem('dc-tab')||'slides');
   fitAll();
