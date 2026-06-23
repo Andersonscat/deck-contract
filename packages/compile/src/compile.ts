@@ -95,7 +95,9 @@ function layoutToCss(node: DeckNode): string {
 function attrs(node: DeckNode): string {
   const style = [layoutToCss(node), styleToCss(node.style)].filter(Boolean).join(";");
   const styleAttr = style ? ` style="${esc(style)}"` : "";
-  return ` data-cid="${esc(node.id)}"${styleAttr}`;
+  const roleAttr = node.role ? ` data-role="${esc(node.role)}"` : "";
+  // data-type/data-role let an interactive viewer know what was clicked.
+  return ` data-cid="${esc(node.id)}" data-type="${esc(node.type)}"${roleAttr}${styleAttr}`;
 }
 
 function renderLeaf(node: DeckNode): string {

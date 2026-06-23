@@ -20,10 +20,13 @@ async function main(): Promise<void> {
   const registryDir = process.env.DECK_REGISTRY ?? join(repoRoot, "registry");
   const decksDir = process.env.DECK_STORE ?? join(homedir(), ".deck-contract", "decks");
 
+  const selectionPath = process.env.DECK_SELECTION ?? join(homedir(), ".deck-contract", "selection.json");
+  const outDir = process.env.DECK_OUT ?? join(homedir(), ".deck-contract", "out");
+
   const store = new FileDeckStore(decksDir);
   const renderer = new LocalChromiumRenderer();
   const templates = new FileTemplateSource(registryDir);
-  const service = new DeckService(store, renderer, templates);
+  const service = new DeckService(store, renderer, templates, outDir, selectionPath);
 
   const server = createServer(service);
   await server.connect(new StdioServerTransport());

@@ -29,6 +29,9 @@ importers:
       '@deck/renderer':
         specifier: workspace:*
         version: link:packages/renderer
+      '@deck/viewer':
+        specifier: workspace:*
+        version: link:packages/viewer
       '@types/node':
         specifier: ^22.10.0
         version: 22.20.0
@@ -125,6 +128,18 @@ importers:
       playwright:
         specifier: ^1.49.1
         version: 1.61.0
+
+  packages/viewer:
+    dependencies:
+      '@deck/compile':
+        specifier: workspace:*
+        version: link:../compile
+      '@deck/contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@deck/core':
+        specifier: workspace:*
+        version: link:../core
 
 packages:
 

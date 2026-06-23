@@ -10,7 +10,8 @@
     "preview": "tsx examples/preview.ts",
     "render": "tsx examples/render.ts",
     "loop": "tsx examples/loop.ts",
-    "agent": "tsx examples/agent.ts"
+    "agent": "tsx examples/agent.ts",
+    "viewer": "tsx examples/view.ts"
   },
   "devDependencies": {
     "@deck/compile": "workspace:*",
@@ -20,6 +21,7 @@
     "@deck/loop": "workspace:*",
     "@deck/mcp-server": "workspace:*",
     "@deck/renderer": "workspace:*",
+    "@deck/viewer": "workspace:*",
     "@types/node": "^22.10.0",
     "tsx": "^4.22.4",
     "typescript": "^5.7.2",

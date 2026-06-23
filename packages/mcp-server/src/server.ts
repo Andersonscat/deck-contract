@@ -50,6 +50,27 @@ export function createServer(service: DeckService): McpServer {
   );
 
   server.registerTool(
+    "open_deck",
+    {
+      description:
+        "Open an existing deck.json file as a live session shared with the viewer. Edits write back to that file so the user sees them live. Returns a deck_id and the outline.",
+      inputSchema: { path: z.string() },
+    },
+    ({ path }) => guard(async () => ok(await service.openDeck(path))),
+  );
+
+  server.registerTool(
+    "get_selection",
+    {
+      description:
+        "Get the component the user clicked and marked in the viewer — the element they want you to change. Use it when the user says 'this', 'the selected one', etc.",
+      inputSchema: {},
+      annotations: { readOnlyHint: true },
+    },
+    () => guard(async () => ok(await service.getSelection())),
+  );
+
+  server.registerTool(
     "get_outline",
     {
       description: "Flat list of every component (id, type, role, slide, text preview) for targeting edits.",
