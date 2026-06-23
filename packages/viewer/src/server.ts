@@ -2,9 +2,9 @@ import { createServer as createHttp, type IncomingMessage, type ServerResponse }
 import { readFile, writeFile } from "node:fs/promises";
 import { watch, type FSWatcher } from "node:fs";
 import { parseDeck } from "@deck/contract";
-import { compileHtml } from "@deck/compile";
+import { compileSlides } from "@deck/compile";
 import { apply, parseOps } from "@deck/core";
-import { CHROME_CSS, CLIENT_JS, chromeHtml } from "./client.js";
+import { CHROME_CSS, CLIENT_JS } from "./client.js";
 
 /**
  * Local interactive viewer — the human half of the loop. It renders the live deck,
@@ -38,10 +38,33 @@ export function createViewerServer(opts: ViewerOptions) {
     const url = req.url ?? "/";
     try {
       if (req.method === "GET" && (url === "/" || url.startsWith("/?"))) {
-        const { html } = compileHtml(await readDeck());
-        const page = html
-          .replace("</head>", "<style>" + CHROME_CSS + "</style></head>")
-          .replace("</body>", chromeHtml(CLIENT_JS) + "</body>");
+        const { css, slides } = compileSlides(await readDeck());
+        const stage = slides
+          .map((s, i) => '<div class="dc-frame' + (i === 0 ? " dc-on" : "") + '" data-idx="' + i + '">' + s.html + "</div>")
+          .join("");
+        const film = slides
+          .map((s, i) => {
+            const thumb = s.html
+              .replace(/ data-cid="[^"]*"/g, "")
+              .replace(/ data-type="[^"]*"/g, "")
+              .replace(/ data-role="[^"]*"/g, "");
+            return (
+              '<button class="dc-thumb' + (i === 0 ? " dc-cur" : "") + '" data-idx="' + i + '">' +
+              '<span class="dc-no">' + (i + 1) + "</span>" + thumb + "</button>"
+            );
+          })
+          .join("");
+        const page =
+          '<!doctype html><html lang="en"><head><meta charset="utf-8"/><title>deck-contract viewer</title><style>' +
+          css + "\n" + CHROME_CSS + "</style></head><body class=\"dc-app\">" +
+          '<div id="dc-bar">deck-contract viewer · click an element</div>' +
+          '<div id="dc-nav"><button id="dc-prev" title="previous slide">‹</button>' +
+          '<span id="dc-count"></span><button id="dc-next" title="next slide">›</button></div>' +
+          '<div id="dc-stage">' + stage + "</div>" +
+          '<div id="dc-film">' + film + "</div>" +
+          '<div id="dc-panel">click an element to select it</div>' +
+          '<div id="dc-flash"></div>' +
+          "<script>" + CLIENT_JS + "</script></body></html>";
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(page);
         return;

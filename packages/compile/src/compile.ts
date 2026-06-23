@@ -147,6 +147,14 @@ html,body{padding:0}
 ul{list-style:disc;padding-left:1.2em}
 ul li::marker{color:var(--marker-color)}`;
 
+/** Per-slide fragments + shared CSS, for hosts that frame each slide separately (the viewer). */
+export function compileSlides(deck: Deck): { css: string; slides: { id: string; html: string }[] } {
+  const vars = themeToCssVars(deck.theme);
+  const css = `:root{\n${vars}\n}\n${BASE_CSS}`;
+  const slides = deck.slides.map((s) => ({ id: s.id, html: renderSlide(s, deck.canvas) }));
+  return { css, slides };
+}
+
 export function compileHtml(deck: Deck): CompiledHtml {
   const vars = themeToCssVars(deck.theme);
   const css = `:root{\n${vars}\n}\n${BASE_CSS}`;
