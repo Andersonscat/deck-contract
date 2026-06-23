@@ -1,0 +1,13 @@
+{
+  "name": "@deck/renderer",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@deck/compile": "workspace:*",
+    "@deck/contract": "workspace:*",
+    "playwright": "^1.49.1"
+  }
+}

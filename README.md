@@ -29,8 +29,9 @@ about transport.
 | package           | role                                                            |
 | ----------------- | --------------------------------------------------------------- |
 | `@deck/contract`  | Zod schemas, contract version, `issues[]` enum. Zero deps.      |
-| `@deck/core`      | immutable tree, stable id allocator, transactional `apply`+inverse |
+| `@deck/core`      | immutable tree, stable id allocator, transactional `apply`+inverse, token validation |
 | `@deck/compile`   | `compileHtml(deck)` — pure, deterministic deck → HTML/CSS        |
+| `@deck/renderer`  | `LocalChromiumRenderer` — headless Chromium → PNG + `issues[]` (overflow/out-of-bounds) |
 
 Dependency rule: everything depends on `contract`; `contract` depends on nothing. The
 domain ("slide", "title") must never leak into `core`/`contract`.
@@ -47,14 +48,16 @@ domain ("slide", "title") must never leak into `core`/`contract`.
 
 ```bash
 pnpm install
-pnpm test        # 23 tests: id stability, atomicity, inverse round-trip, token-only, determinism
+pnpm --filter @deck/renderer exec playwright install chromium   # one-time
+pnpm test        # 34 tests: id stability, atomicity, inverse, token-only, determinism, render+overflow
 pnpm preview     # compile the sample deck -> examples/out/preview.html
+pnpm render      # surgical edit -> headless Chromium -> examples/out/slide-*.png
 ```
 
 ## Status
 
 - [x] **Day 1** — contract, core (tree/ids/ops), pure compile, tests without a browser
-- [ ] **Day 2** — `LocalChromiumRenderer`: warm browser, embedded fonts, overflow/font-drift
-      measurement, deterministic `issues[]` snapshots
+- [x] **Day 2** — `LocalChromiumRenderer`: warm browser, network-blocked, fonts awaited,
+      deterministic overflow / out-of-bounds measurement, PNG screenshots
 - [ ] **Day 3** — render-and-check loop + fake-solver convergence test on golden fixtures
 - [ ] **Day 4** — 7 MCP tools, PDF export, package loader, wire a real model over the loop
