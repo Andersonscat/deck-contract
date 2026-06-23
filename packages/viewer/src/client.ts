@@ -42,6 +42,7 @@ export const CHROME_CSS = `
 .dc-selected{ outline:2px solid #ec5a13 !important; outline-offset:-2px; }
 #dc-hover{ position:fixed; pointer-events:none; z-index:35; display:none; border:2px solid rgba(74,108,247,.55); border-radius:3px; }
 #dc-hover.drop{ border-color:#ec5a13; background:rgba(236,90,19,.08); }
+#dc-coord{ position:fixed; pointer-events:none; z-index:60; display:none; background:#1c1f26; color:#fff; font:12px/1 -apple-system,Segoe UI,sans-serif; padding:8px 12px; border-radius:9px; white-space:nowrap; transform:translateX(-50%); }
 #dc-topbar{ position:relative; z-index:50; margin:12px 16px 6px; min-height:54px; flex:none; display:flex; align-items:center; gap:10px; padding:0 14px; background:#fff; border:1px solid #e6e8ee; border-radius:14px; overflow:visible; }
 #dc-tool{ display:flex; align-items:center; gap:12px; font:13px -apple-system,Segoe UI,sans-serif; color:#5b606b; white-space:nowrap; }
 #dc-tool.dc-empty{ color:#9aa0aa; }
@@ -214,8 +215,9 @@ export const CLIENT_JS = `
   });
   // hover frame + free drag (move by coordinates -> set_frame / move_to)
   var dragHover=null, candEl=null, downPt=null, dragging=false, dragNode=null, dragged=false;
-  var dragStart=null, dragSc=1, dragHasFrame=false;
+  var dragStart=null, dragSc=1, dragHasFrame=false, coordEl=null;
   function hbox(){ if(!dragHover){ dragHover=document.createElement('div'); dragHover.id='dc-hover'; document.body.appendChild(dragHover); } return dragHover; }
+  function cbox(){ if(!coordEl){ coordEl=document.createElement('div'); coordEl.id='dc-coord'; document.body.appendChild(coordEl); } return coordEl; }
   function showBox(el){ var h=hbox(); var r=el.getBoundingClientRect(); h.className=''; h.style.display='block'; h.style.left=r.left+'px'; h.style.top=r.top+'px'; h.style.width=r.width+'px'; h.style.height=r.height+'px'; }
   function hideBox(){ if(dragHover) dragHover.style.display='none'; }
   function round3(n){ return Math.round(n*1000)/1000; }
@@ -223,13 +225,22 @@ export const CLIENT_JS = `
   stage.addEventListener('mouseleave',function(){ if(!dragging) hideBox(); });
   stage.addEventListener('mousedown',function(e){ var el=e.target.closest('#dc-stage [data-cid]'); if(!el||el.getAttribute('data-type')==='slide') return; candEl=el; downPt={x:e.clientX,y:e.clientY}; dragged=false; });
   document.addEventListener('mousemove',function(e){
-    if(dragging){ dragNode.style.transform='translate('+(e.clientX-dragStart.mx)+'px,'+(e.clientY-dragStart.my)+'px)'; return; }
+    if(dragging){
+      var dx=e.clientX-dragStart.mx, dy=e.clientY-dragStart.my;
+      dragNode.style.transform='translate('+dx+'px,'+dy+'px)';
+      var xpt=Math.round((dragStart.x+dx/dragSc/1280*100)/100*1280);
+      var ypt=Math.round((dragStart.y+dy/dragSc/720*100)/100*720);
+      var c=cbox(); c.style.display='block'; c.textContent='x: '+xpt+' pt   y: '+ypt+' pt';
+      var r=dragNode.getBoundingClientRect(); c.style.left=(r.left+r.width/2)+'px'; c.style.top=Math.max(8,r.top-40)+'px';
+      return;
+    }
     if(!candEl) return;
     if(Math.abs(e.clientX-downPt.x)+Math.abs(e.clientY-downPt.y)>5) startDrag();
   });
   document.addEventListener('mouseup',function(e){ if(dragging) endDrag(e); candEl=null; });
   function startDrag(){
     dragging=true; dragNode=candEl; dragged=true; hideBox(); document.body.style.cursor='grabbing';
+    document.body.style.userSelect='none'; var sg=window.getSelection&&window.getSelection(); if(sg&&sg.removeAllRanges) sg.removeAllRanges();
     var fr=dragNode.closest('.dc-frame'); var frr=fr.getBoundingClientRect(); dragSc=frr.width/1280;
     var er=dragNode.getBoundingClientRect();
     dragHasFrame=(getComputedStyle(dragNode).position==='absolute');
@@ -242,7 +253,7 @@ export const CLIENT_JS = `
     var cid=dragNode.getAttribute('data-cid');
     if(dragHasFrame) op([{op:'move_to',nodeId:cid,x:nx,y:ny}]);
     else op([{op:'set_frame',nodeId:cid,frame:{x:nx,y:ny,w:round3(dragStart.w),h:round3(dragStart.h)}}]);
-    dragging=false; document.body.style.cursor='';
+    dragging=false; document.body.style.cursor=''; document.body.style.userSelect=''; if(coordEl) coordEl.style.display='none';
     // transform stays until soft-refresh replaces the element at its new absolute position
   }
   // close any open custom dropdown when clicking elsewhere
