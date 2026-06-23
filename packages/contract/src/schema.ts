@@ -75,6 +75,8 @@ export const ContentSchema = z
     caption: z.string().optional(),
     /** bar-chart: ordered categories with numeric values. */
     data: z.array(z.object({ label: z.string(), value: z.number() }).strict()).optional(),
+    /** bar (one column of a decomposed bar-chart): its height as a 0..100 percentage. */
+    barValue: z.number().optional(),
     /** table: header cells + body rows (rows are arrays of string cells). */
     columns: z.array(z.string()).optional(),
     rows: z.array(z.array(z.string())).optional(),

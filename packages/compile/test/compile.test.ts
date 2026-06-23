@@ -61,4 +61,27 @@ describe("compileHtml", () => {
     expect(html).toContain("A &amp; B &lt;script&gt;");
     expect(html).not.toContain("<script>");
   });
+
+  it("renders a decomposed bar-chart as individually-addressable bars", () => {
+    const deck = parseDeck(makeDeck());
+    deck.slides[0]!.children!.push({
+      id: "chart1",
+      type: "bar-chart",
+      frame: { x: 10, y: 30, w: 60, h: 40 },
+      layout: { direction: "row", align: "end" },
+      children: [
+        { id: "b1", type: "bar", content: { barValue: 40 }, style: { color: "token://color/accent" } },
+        { id: "b2", type: "bar", content: { barValue: 90 }, style: { color: "token://color/muted" } },
+      ],
+    } as never);
+    const { html } = compileHtml(deck);
+    // each bar is its own addressable node, height from barValue, fill from its color token
+    expect(html).toContain('data-cid="b1"');
+    expect(html).toContain('data-cid="b2"');
+    expect(html).toContain('data-type="bar"');
+    expect(html).toContain("height:40%");
+    expect(html).toContain("height:90%");
+    expect(html).toContain("background:var(--color-accent)");
+    expect(html).toContain("background:var(--color-muted)");
+  });
 });

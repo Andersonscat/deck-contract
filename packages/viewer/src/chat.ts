@@ -13,6 +13,7 @@ export interface ChatResult {
 
 function preview(node: DeckNode): string {
   const c = node.content ?? {};
+  if (node.type === "bar") return `${c.label ? c.label + " " : ""}${c.barValue ?? "?"}%`;
   const t = c.text ?? c.items?.[0] ?? c.value ?? c.caption ?? "";
   return t.length > 50 ? t.slice(0, 47) + "…" : t;
 }
@@ -62,6 +63,8 @@ export async function runChat(
     "- bullet-list (role supporting-points): bullet points. Words: список, буллеты, list, points. Edit: set_content { items:[...] }.",
     "- stat-callout (role key-metric): a big metric. Words: метрика, число, показатель, KPI. Edit: set_content { value, label, delta }.",
     "- image-caption (role visual): image + caption. Words: картинка, изображение, image. Edit: set_content { src, alt, caption }.",
+    "- bar-chart (role chart): a CONTAINER whose children are individual `bar` components (one per column), in order. Words: график, диаграмма, chart, bar chart.",
+    "- bar (role bar): ONE column of a bar-chart, individually addressable by its id. content.barValue is its height 0..100; style.color is its fill. \"the third bar / третий столбец\" = the 3rd `bar` child of that chart, in order. Edit ONE bar: set_token {prop:color} to recolour it, set_content {barValue:N} to change its height/size. Never edit the others unless asked.",
     "",
     "Rules: style/colors only via set_token with theme tokens (never raw hex/px). Only edit nodes that exist.",
     "Available theme tokens: " + tokens(deck),

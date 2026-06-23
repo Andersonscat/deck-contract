@@ -159,7 +159,8 @@ export const CLIENT_JS = `
   // contextual toolbar: which style props each component type exposes, and its text field
   function styleProps(type){
     if(type==='stat-callout') return {font:'valueFont',size:'valueSize',color:'valueColor'};
-    if(type==='image-caption'||type==='slide'||type==='container') return {};
+    if(type==='bar') return {color:'color'};
+    if(type==='image-caption'||type==='slide'||type==='container'||type==='bar-chart') return {};
     return {font:'font',size:'size',color:'color'};
   }
   function contentField(type){
@@ -179,7 +180,7 @@ export const CLIENT_JS = `
   function tokenToVarJS(ref){ var m=/^token:\\/\\/([a-z][a-z0-9]*)\\/([A-Za-z0-9][A-Za-z0-9-]*)$/.exec(ref); return m?'var(--'+m[1]+'-'+m[2]+')':ref; }
   function applyOptimistic(ops){
     for(var i=0;i<ops.length;i++){ var o=ops[i]; var el=document.querySelector('#dc-stage [data-cid="'+o.nodeId+'"]'); if(!el) return false;
-      if(o.op==='set_token'){ el.style.setProperty(CSS_PROP[o.prop]||('--'+o.prop), tokenToVarJS(o.value)); }
+      if(o.op==='set_token'){ var cp=CSS_PROP[o.prop]||('--'+o.prop); if(o.prop==='color'&&el.getAttribute('data-type')==='bar') cp='background'; el.style.setProperty(cp, tokenToVarJS(o.value)); }
       else if(o.op==='set_align'){ el.style.textAlign=o.value; }
       else if(o.op==='set_frame'){ var f=o.frame; el.style.position='absolute'; el.style.left=f.x+'%'; el.style.top=f.y+'%'; if(f.w!=null) el.style.width=f.w+'%'; if(f.h!=null) el.style.height=f.h+'%'; }
       else if(o.op==='move_to'){ el.style.left=o.x+'%'; el.style.top=o.y+'%'; }
@@ -382,12 +383,16 @@ export const CLIENT_JS = `
   }; })(sw[s]); }
 
   // select / edit on the stage
+  // Composite components (e.g. bar-chart) are selected as ONE unit on a single click; a
+  // double-click drills in to the individual sub-component (a bar) so you can edit just it.
+  var GROUP_TYPES=['bar-chart'];
+  function selectTarget(el){ var n=el, group=null; while(n&&n.tagName!=='SECTION'){ if(GROUP_TYPES.indexOf(n.getAttribute('data-type'))>=0) group=n; var p=n.parentElement; n=p?p.closest('#dc-stage [data-cid]'):null; } return group||el; }
   document.addEventListener('click',function(e){
     if(dragged){ dragged=false; return; }
     if(e.target.closest('#dc-topbar')||e.target.closest('#dc-left')||e.target.closest('#dc-right')) return;
     var el=e.target.closest('#dc-stage [data-cid]');
     if(!el||el.tagName==='SECTION'){ clearSel(); return; } // clicking the slide background deselects
-    e.preventDefault(); select(el);
+    e.preventDefault(); select(selectTarget(el));
   });
   // hover frame + free drag (move by coordinates -> set_frame / move_to)
   var dragHover=null, candEl=null, downPt=null, dragging=false, dragNode=null, dragged=false;
@@ -397,9 +402,9 @@ export const CLIENT_JS = `
   function showBox(el){ var h=hbox(); var r=el.getBoundingClientRect(); h.className=''; h.style.display='block'; h.style.left=r.left+'px'; h.style.top=r.top+'px'; h.style.width=r.width+'px'; h.style.height=r.height+'px'; }
   function hideBox(){ if(dragHover) dragHover.style.display='none'; }
   function round3(n){ return Math.round(n*1000)/1000; }
-  stage.addEventListener('mousemove',function(e){ if(dragging) return; var el=e.target.closest('#dc-stage [data-cid]'); if(el&&el.tagName!=='SECTION') showBox(el); else hideBox(); });
+  stage.addEventListener('mousemove',function(e){ if(dragging) return; var el=e.target.closest('#dc-stage [data-cid]'); if(el&&el.tagName!=='SECTION') showBox(selectTarget(el)); else hideBox(); });
   stage.addEventListener('mouseleave',function(){ if(!dragging) hideBox(); });
-  stage.addEventListener('mousedown',function(e){ var el=e.target.closest('#dc-stage [data-cid]'); if(!el||el.tagName==='SECTION') return; candEl=el; downPt={x:e.clientX,y:e.clientY}; dragged=false; });
+  stage.addEventListener('mousedown',function(e){ var el=e.target.closest('#dc-stage [data-cid]'); if(!el||el.tagName==='SECTION') return; candEl=selectTarget(el); downPt={x:e.clientX,y:e.clientY}; dragged=false; });
   document.addEventListener('mousemove',function(e){
     if(resizing){ doResize(e); return; }
     if(dragging){ var s=snapDrag(e); dragLast=s; applyDragVisual(s); return; }
@@ -617,7 +622,7 @@ export const CLIENT_JS = `
 
   // close any open custom dropdown when clicking elsewhere
   document.addEventListener('click',function(e){ if(e.target.closest('.dc-dd')) return; var m=document.querySelectorAll('.dc-dd-menu.on'); for(var i=0;i<m.length;i++) m[i].classList.remove('on'); });
-  document.addEventListener('dblclick',function(e){ var el=e.target.closest('#dc-stage [data-cid]'); if(!el) return; var type=el.getAttribute('data-type'); if(type!=='title'&&type!=='heading') return; e.preventDefault(); editText(el); });
+  document.addEventListener('dblclick',function(e){ var el=e.target.closest('#dc-stage [data-cid]'); if(!el||el.tagName==='SECTION') return; var type=el.getAttribute('data-type'); e.preventDefault(); if(type==='title'||type==='heading') editText(el); else select(el); });
 
   // AI chat — tells the model which slide is in view
   var chat=document.getElementById('dc-chat');

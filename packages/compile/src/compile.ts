@@ -168,9 +168,34 @@ function renderLeaf(node: DeckNode): string {
         .join("");
       return `<div${attrs(node)}><table class="dc-table">${head}<tbody>${rows}</tbody></table></div>`;
     }
+    case "bar":
+      return renderBar(node);
     default:
       return `<div${attrs(node)}>${esc(c.text ?? "")}</div>`;
   }
+}
+
+/**
+ * A single bar = one addressable component of a decomposed bar-chart. Height comes from
+ * content.barValue (0..100% of the chart box); the fill is the node's own `color` token
+ * (rendered as background) so the standard recolor/AI path targets ONE bar by its id.
+ */
+function renderBar(node: DeckNode): string {
+  const c = node.content ?? {};
+  const v = Math.max(0, Math.min(100, Number(c.barValue ?? 0)));
+  const fill = node.style?.color ?? node.style?.background;
+  const parts: string[] = [];
+  if (node.frame) parts.push(frameToCss(node.frame));
+  parts.push(
+    "flex:1 1 0%",
+    "min-width:0",
+    "align-self:flex-end",
+    `height:${fmt(v)}%`,
+    "border-radius:7px 7px 0 0",
+    `background:${fill ? tokenToVar(fill) : "var(--color-accent)"}`,
+  );
+  const roleAttr = node.role ? ` data-role="${esc(node.role)}"` : "";
+  return `<div data-cid="${esc(node.id)}" data-type="bar"${roleAttr} style="${esc(parts.join(";"))}"></div>`;
 }
 
 function renderNode(node: DeckNode): string {
