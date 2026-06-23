@@ -156,7 +156,7 @@ function renderSlide(slide: DeckNode, canvas: { width: number; height: number })
   const box = `width:${canvas.width}px;height:${canvas.height}px;${layoutToCss(slide)};${styleToCss(
     slide.style,
   )}`;
-  return `<section class="slide" data-cid="${esc(slide.id)}" style="${esc(box)}">${inner}</section>`;
+  return `<section class="slide" data-cid="${esc(slide.id)}" data-type="slide" style="${esc(box)}">${inner}</section>`;
 }
 
 const BASE_CSS = `*{margin:0;box-sizing:border-box;animation:none!important;transition:none!important}

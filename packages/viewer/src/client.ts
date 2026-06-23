@@ -218,7 +218,7 @@ export const CLIENT_JS = `
     if(dragged){ dragged=false; return; }
     if(e.target.closest('#dc-topbar')||e.target.closest('#dc-left')||e.target.closest('#dc-right')) return;
     var el=e.target.closest('#dc-stage [data-cid]');
-    if(!el){ clearSel(); return; }
+    if(!el||el.tagName==='SECTION'){ clearSel(); return; } // clicking the slide background deselects
     e.preventDefault(); select(el);
   });
   // hover frame + free drag (move by coordinates -> set_frame / move_to)
@@ -229,9 +229,9 @@ export const CLIENT_JS = `
   function showBox(el){ var h=hbox(); var r=el.getBoundingClientRect(); h.className=''; h.style.display='block'; h.style.left=r.left+'px'; h.style.top=r.top+'px'; h.style.width=r.width+'px'; h.style.height=r.height+'px'; }
   function hideBox(){ if(dragHover) dragHover.style.display='none'; }
   function round3(n){ return Math.round(n*1000)/1000; }
-  stage.addEventListener('mousemove',function(e){ if(dragging) return; var el=e.target.closest('#dc-stage [data-cid]'); if(el&&el.getAttribute('data-type')!=='slide') showBox(el); else hideBox(); });
+  stage.addEventListener('mousemove',function(e){ if(dragging) return; var el=e.target.closest('#dc-stage [data-cid]'); if(el&&el.tagName!=='SECTION') showBox(el); else hideBox(); });
   stage.addEventListener('mouseleave',function(){ if(!dragging) hideBox(); });
-  stage.addEventListener('mousedown',function(e){ var el=e.target.closest('#dc-stage [data-cid]'); if(!el||el.getAttribute('data-type')==='slide') return; candEl=el; downPt={x:e.clientX,y:e.clientY}; dragged=false; });
+  stage.addEventListener('mousedown',function(e){ var el=e.target.closest('#dc-stage [data-cid]'); if(!el||el.tagName==='SECTION') return; candEl=el; downPt={x:e.clientX,y:e.clientY}; dragged=false; });
   document.addEventListener('mousemove',function(e){
     if(resizing){ doResize(e); return; }
     if(dragging){
@@ -277,7 +277,7 @@ export const CLIENT_JS = `
     });
   }
   function positionHandles(){
-    if(!sel||sel.getAttribute('data-type')==='slide'){ hideHandles(); return; }
+    if(!sel||sel.tagName==='SECTION'){ hideHandles(); return; }
     ensureHandles(); var r=sel.getBoundingClientRect();
     var pts={ nw:[r.left,r.top], n:[r.left+r.width/2,r.top], ne:[r.right,r.top], e:[r.right,r.top+r.height/2], se:[r.right,r.bottom], s:[r.left+r.width/2,r.bottom], sw:[r.left,r.bottom], w:[r.left,r.top+r.height/2] };
     HK.forEach(function(k){ var pt=pts[k]; handleDivs[k].style.left=(pt[0]-5)+'px'; handleDivs[k].style.top=(pt[1]-5)+'px'; });
