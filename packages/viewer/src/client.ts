@@ -74,9 +74,12 @@ export const CHROME_CSS = `
 .dc-msg.user{ align-self:flex-end; background:#ec5a13; color:#fff; }
 .dc-msg.ai{ align-self:flex-start; background:#f1f2f4; color:#222; }
 .dc-msg.sys{ align-self:center; color:#9298a3; font-size:12px; }
-#dc-chat-form{ display:flex; gap:6px; padding:10px; border-top:1px solid #eee; }
-#dc-chat-input{ flex:1; border:1px solid #d2d6de; border-radius:8px; padding:8px; font:13px sans-serif; resize:none; }
-#dc-chat-send{ border:none; background:#ec5a13; color:#fff; border-radius:8px; width:38px; cursor:pointer; font-size:16px; }
+#dc-chat-form{ padding:12px; border-top:1px solid #eef0f2; }
+.dc-inwrap{ position:relative; border:1px solid #e6e8ee; border-radius:14px; background:#fff; padding:11px 48px 11px 13px; transition:border-color .12s; }
+.dc-inwrap:focus-within{ border-color:#cdd2da; }
+#dc-chat-input{ display:block; width:100%; border:none; outline:none; resize:none; background:none; font:13px/1.45 -apple-system,Segoe UI,sans-serif; color:#1f2330; max-height:140px; overflow-y:auto; }
+#dc-chat-send{ position:absolute; right:8px; bottom:8px; width:31px; height:31px; border:none; background:#ec5a13; color:#fff; border-radius:9px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; transition:background .12s; }
+#dc-chat-send:hover{ background:#d8500f; }
 `;
 
 export const CLIENT_JS = `
@@ -234,9 +237,13 @@ export const CLIENT_JS = `
   // AI chat — tells the model which slide is in view
   var chat=document.getElementById('dc-chat');
   function addMsg(cls,text){ var d=document.createElement('div'); d.className='dc-msg '+cls; d.textContent=text; chat.appendChild(d); chat.scrollTop=chat.scrollHeight; return d; }
+  var ci=document.getElementById('dc-chat-input');
+  function autoGrow(){ ci.style.height='auto'; ci.style.height=Math.min(ci.scrollHeight,140)+'px'; }
+  ci.addEventListener('input',autoGrow);
+  ci.addEventListener('keydown',function(e){ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); document.getElementById('dc-chat-form').requestSubmit(); } });
   document.getElementById('dc-chat-form').addEventListener('submit',function(e){ e.preventDefault();
-    var input=document.getElementById('dc-chat-input'); var msg=input.value.trim(); if(!msg) return;
-    input.value=''; addMsg('user',msg); var pending=addMsg('sys','…');
+    var msg=ci.value.trim(); if(!msg) return;
+    ci.value=''; autoGrow(); addMsg('user',msg); var pending=addMsg('sys','…');
     var selId=sel?sel.getAttribute('data-cid'):null;
     post('/api/chat',{message:msg,currentSlideId:curSlideId(),selectedId:selId}).then(function(res){ pending.remove(); addMsg('ai',res.reply||'(no reply)'); if(res.applied){ flash('applied '+res.applied+' edit(s)'); } }).catch(function(err){ pending.remove(); addMsg('sys','error: '+err); });
   });

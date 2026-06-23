@@ -128,10 +128,9 @@ export function createViewerServer(opts: ViewerOptions) {
       '<div id="dc-flash"></div>' +
       "</div>" +
       '<div id="dc-right"><div id="dc-chat-head">AI assistant</div>' +
-      '<div id="dc-chat"><div class="dc-msg sys">' +
-      (apiKey ? "Describe a change — e.g. “make the title shorter” or “change the metric to 4x”." : "Chat disabled: no ANTHROPIC_API_KEY.") +
-      "</div></div>" +
-      '<form id="dc-chat-form"><textarea id="dc-chat-input" rows="2" placeholder="Ask to change a slide…"></textarea><button id="dc-chat-send" type="submit">↑</button></form>' +
+      '<div id="dc-chat"></div>' +
+      '<form id="dc-chat-form"><div class="dc-inwrap"><textarea id="dc-chat-input" rows="1" placeholder="Ask to change a slide…"></textarea>' +
+      '<button id="dc-chat-send" type="submit" title="send"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div></form>' +
       "</div><script>window.DC_THEME=" +
       JSON.stringify({
         font: Object.keys(deck.theme.font),
