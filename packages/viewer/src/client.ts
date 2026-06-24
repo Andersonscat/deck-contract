@@ -395,14 +395,35 @@ export const CLIENT_JS = `
     var del=document.createElement('button'); del.type='button'; del.className='dc-add dc-danger'; del.textContent='Delete'; del.onclick=function(ev){ ev.stopPropagation(); deleteSlide(cid); };
     tool.appendChild(dup); tool.appendChild(del);
   }
+  function slideIndexOf(slideId){ for(var i=0;i<frames.length;i++){ var s=frames[i].querySelector('section'); if(s&&s.getAttribute('data-cid')===slideId) return i; } return -1; }
+  function syncSlideCache(slides){ lastSlideHtml=[]; for(var k=0;k<slides.length;k++) lastSlideHtml[k]=slides[k].html; }
+  // Duplicate / delete a slide WITHOUT a full page reload: patch the stage + thumbnails in place.
   function duplicateSlide(slideId){
     fetch('/api/node?id='+encodeURIComponent(slideId)).then(function(r){ return r.json(); }).then(function(n){ if(!n||!n.id) return;
-      post('/api/paste',{node:n,parentId:'@slides',index:cur+1}).then(function(res){ if(res&&res.error){ flash('error: '+res.error); return; } sessionStorage.setItem('dc-cur',String(cur+1)); location.reload(); });
+      var at=slideIndexOf(slideId); opInFlight++; opSeq++;
+      post('/api/paste',{node:n,parentId:'@slides',index:at+1}).then(function(res){ opInFlight--;
+        if(res&&res.error){ flash('error: '+res.error); return; }
+        if(!res.slides){ return; }
+        var ni=at+1; var html=res.slides[ni].html;
+        var fr=document.createElement('div'); fr.className='dc-frame'; fr.innerHTML=html;
+        var rf=frames[at]; if(rf&&rf.nextSibling) stage.insertBefore(fr,rf.nextSibling); else stage.appendChild(fr);
+        var row=document.createElement('div'); row.className='dc-thumbrow'; var no=document.createElement('span'); no.className='dc-no'; row.appendChild(no);
+        var tb=document.createElement('button'); tb.className='dc-slidethumb'; tb.setAttribute('draggable','true'); tb.setAttribute('data-sid',res.newId); tb.innerHTML=stripIds(html); row.appendChild(tb);
+        var rr=thumbs[at]&&thumbs[at].closest('.dc-thumbrow'); if(rr&&rr.nextSibling) thumbWrap.insertBefore(row,rr.nextSibling); else thumbWrap.appendChild(row);
+        wireThumb(tb); makeDraggable(tb);
+        syncSlideCache(res.slides); setHist(res); refreshSlideArrays(); goTo(ni);
+      },function(){ opInFlight--; });
     }).catch(function(){});
   }
   function deleteSlide(slideId){
     if(frames.length<=1){ flash('cannot delete the last slide'); return; }
-    post('/api/op',{ops:[{op:'remove_node',nodeId:slideId}]}).then(function(res){ if(res&&res.error){ flash('error: '+res.error); return; } sessionStorage.setItem('dc-cur',String(Math.max(0,cur-1))); location.reload(); });
+    var at=slideIndexOf(slideId); opInFlight++; opSeq++;
+    post('/api/op',{ops:[{op:'remove_node',nodeId:slideId}]}).then(function(res){ opInFlight--;
+      if(res&&res.error){ flash('error: '+res.error); return; }
+      if(at>=0){ var fr=frames[at]; var row=thumbs[at]&&thumbs[at].closest('.dc-thumbrow'); if(fr) fr.remove(); if(row) row.remove(); }
+      clearSel(); if(res.slides) syncSlideCache(res.slides); setHist(res); refreshSlideArrays();
+      var go=Math.min(at,frames.length-1); if(frames[go]) frames[go].scrollIntoView({block:'center'}); updateCurrent();
+    },function(){ opInFlight--; });
   }
 
   window.addEventListener('resize',function(){ fitAll(); updateCurrent(); positionHandles(); });

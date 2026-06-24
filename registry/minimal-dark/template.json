@@ -58,8 +58,7 @@
       "role": "visual",
       "content": {
         "src": "https://picsum.photos/seed/deck/960/540",
-        "alt": "Photo",
-        "caption": "Caption"
+        "alt": "Photo"
       },
       "style": {
         "radius": "token://radius/md",
