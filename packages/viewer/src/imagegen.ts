@@ -13,7 +13,7 @@ export async function generateImage(
   // picture drops onto a slide as a sticker rather than a dark square.
   const fullPrompt =
     prompt.trim() +
-    ". Isolated subject on a fully transparent background, no scenery, no backdrop, centered, generous margins, sticker/cutout style.";
+    ". Full body, natural vivid colours, isolated on a fully transparent background, no scenery, no backdrop, no shadow, no white outline or border, centered with generous margins.";
   const res = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: { "content-type": "application/json", authorization: "Bearer " + apiKey },

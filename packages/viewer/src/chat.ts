@@ -65,7 +65,7 @@ export async function runChat(
     '- {"op":"move_node","nodeId":ID,"newParentId":ID,"index":N}',
     ...(imagesEnabled
       ? [
-          '- {"op":"generate_image","prompt":STRING,"mode":"insert"|"replace","target":ID}   (GENERATE a real picture and place it. Use this for ANY "make/draw/add a picture of X" or "turn this into X / поменяй на X". mode:"replace" + target=the node to become the picture (the selected node if the user pointed at one); mode:"insert" to add a new picture to the current slide. The prompt is a vivid ENGLISH image description; add style cues to match a dark, minimal, modern deck. NEVER fake an image request by writing the word into a text/label field — always use this op.)',
+          '- {"op":"generate_image","prompt":STRING,"mode":"insert"|"replace","target":ID}   (GENERATE a real picture and place it. Use this for ANY "make/draw/add a picture of X" or "turn this into X / поменяй на X". mode:"replace" + target=the node to become the picture (the selected node if the user pointed at one); mode:"insert" to add a new picture to the current slide. The prompt is a vivid ENGLISH image description of the subject in its NATURAL, full colour, full body, on a transparent background; do NOT darken, grey out, or monochrome it to match the deck, and do not ask for a white outline. NEVER fake an image request by writing the word into a text/label field — always use this op.)',
         ]
       : []),
     "",
