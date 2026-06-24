@@ -33,7 +33,7 @@ const LABELS: Record<string, string> = {
   heading: "Heading",
   subtitle: "Subheading",
 };
-const ELEMENT_BLOCKS = ["stat-callout", "bullet-list", "quote", "image-caption", "bar-chart", "table", "two-column"];
+const ELEMENT_BLOCKS = ["image-caption", "bar-chart", "table", "two-column"];
 const TEXT_BLOCKS = ["heading", "subtitle"];
 
 const BULLET_ROW =
