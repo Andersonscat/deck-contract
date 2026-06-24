@@ -171,7 +171,7 @@ export const CLIENT_JS = `
   // the contextual toolbar lives in the fixed top bar (#dc-topbar); no floating
   var TOOL_EMPTY='Select an element to edit it';
   function setHead(t){ var h=document.getElementById('dc-chat-head'); if(h) h.textContent=t; }
-  function deleteNode(cid){ post('/api/op',{ops:[{op:'remove_node',nodeId:cid}]}).then(function(res){ if(res&&res.error) flash('error: '+res.error); else flash('deleted'); }); }
+  function deleteNode(cid){ if(!cid) return; clearSel(); op([{op:'remove_node',nodeId:cid}]).then(function(){ flash('deleted'); }); }
   function clearSel(){ var n=document.querySelectorAll('.dc-selected'); for(var i=0;i<n.length;i++) n[i].classList.remove('dc-selected'); var fs=document.querySelectorAll('.dc-frame-sel'); for(var k=0;k<fs.length;k++) fs[k].classList.remove('dc-frame-sel'); sel=null; setHead('AI assistant'); buildDefaultTool(); hideHandles(); restoreElements(); if(layersOn()) buildLayers(); }
   // when nothing is selected the top bar still shows useful content (insert actions)
   function buildDefaultTool(){
@@ -393,6 +393,7 @@ export const CLIENT_JS = `
     if(sp.color){ var cols=th.color||{}; var ck=Object.keys(cols); tool.appendChild(group('Color', makeDropdown({ value:tokenKey(st[sp.color]), items:ck.map(function(k){ return {v:k,label:cap(k),swatch:cols[k]}; }), onSelect:function(v){ applyToken(cid,sp.color,'token://color/'+v); } }))); }
     if(cf==='text'||cf==='items'){ tool.appendChild(alignSeg(cid,(node&&node.textAlign)||'left')); }
     tool.appendChild(insertBtn('Text','heading'));
+    var del=document.createElement('button'); del.type='button'; del.className='dc-add dc-danger'; del.title='Delete element (or press Delete)'; del.textContent='Delete'; del.onclick=function(ev){ ev.stopPropagation(); deleteNode(cid); }; tool.appendChild(del);
   }
   // Page-level controls shown when the whole slide is selected.
   function buildSlideTool(cid,node){
@@ -497,7 +498,7 @@ export const CLIENT_JS = `
     if(mod&&(e.key==='d'||e.key==='D')){ if(sel){ e.preventDefault(); doDuplicate(); } return; }
     if(e.key==='ArrowDown'){ e.preventDefault(); goTo(Math.min(cur+1,frames.length-1)); }
     if(e.key==='ArrowUp'){ e.preventDefault(); goTo(Math.max(cur-1,0)); }
-    if((e.key==='Delete'||e.key==='Backspace')&&sel){ e.preventDefault(); deleteNode(sel.getAttribute('data-cid')); }
+    if((e.key==='Delete'||e.key==='Backspace')&&sel){ e.preventDefault(); if(sel.tagName==='SECTION') deleteSlide(sel.getAttribute('data-cid')); else deleteNode(sel.getAttribute('data-cid')); }
   });
 
   // left rail tabs
