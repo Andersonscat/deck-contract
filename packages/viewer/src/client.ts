@@ -20,18 +20,18 @@ export const CHROME_CSS = `
 .dc-panel2{ display:none; padding:16px; }
 .dc-panel2.dc-on{ display:block; }
 .dc-panel2 h4{ margin:0 0 12px; font-size:12px; color:#9298a3; font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
-.dc-thumbrow{ display:flex; align-items:center; gap:9px; margin:0 0 12px; }
-.dc-thumbrow .dc-no{ width:16px; flex:none; text-align:right; color:#9298a3; font:600 12px/1 -apple-system,Segoe UI,sans-serif; }
+.dc-thumbrow{ display:flex; align-items:center; gap:8px; margin:0 0 12px; }
+.dc-thumbrow .dc-no{ width:14px; flex:none; text-align:right; color:#9298a3; font:600 12px/1 -apple-system,Segoe UI,sans-serif; }
 .dc-thumbrow.dc-cur .dc-no{ color:#ec5a13; }
 .dc-thumbrow.dc-cur .dc-slidethumb{ border-color:#ec5a13; }
-.dc-slidethumb{ display:block; width:240px; height:135px; padding:0; position:relative; border:2px solid #c7cbd3; border-radius:6px; overflow:hidden; background:#000; cursor:pointer; text-align:left; }
-.dc-slidethumb > section{ transform:scale(0.1875); transform-origin:top left; pointer-events:none; }
+.dc-slidethumb{ flex:1; min-width:0; aspect-ratio:16/9; padding:0; position:relative; border:2px solid #c7cbd3; border-radius:7px; overflow:hidden; background:#000; cursor:pointer; text-align:left; }
+.dc-slidethumb > section{ transform:scale(0.166); transform-origin:top left; pointer-events:none; }
 .dc-slidethumb.dc-dragging{ opacity:0.35; }
 .dc-slidethumb.dc-drop-before{ box-shadow:0 -3px 0 0 #ec5a13; }
 .dc-slidethumb.dc-drop-after{ box-shadow:0 3px 0 0 #ec5a13; }
-#dc-add-slide{ display:flex; align-items:center; justify-content:center; gap:7px; width:240px; margin:2px 0 16px 25px; padding:13px; border:1.5px dashed #c7cbd3; border-radius:8px; background:#fff; color:#5b606b; font-size:13px; font-weight:500; cursor:pointer; }
+#dc-add-slide{ display:block; box-sizing:border-box; width:calc(100% - 22px); text-align:center; margin:2px 0 16px 22px; padding:13px; border:1.5px dashed #c7cbd3; border-radius:8px; background:#fff; color:#5b606b; font-size:13px; font-weight:500; cursor:pointer; }
 #dc-add-slide:hover{ border-color:#ec5a13; color:#ec5a13; }
-#dc-add-slide span{ font-size:17px; line-height:1; }
+#dc-add-slide span{ font-size:16px; line-height:1; vertical-align:-1px; margin-right:5px; }
 #dc-pageno{ position:fixed; bottom:18px; transform:translateX(-50%); z-index:55; display:flex; align-items:center; gap:6px; background:rgba(16,18,24,.85); color:#fff; font:600 13px/1 -apple-system,Segoe UI,sans-serif; padding:9px 15px; border-radius:20px; pointer-events:none; box-shadow:0 4px 16px rgba(0,0,0,.18); }
 #dc-pageno b{ color:#ec5a13; }
 
@@ -134,7 +134,10 @@ export const CLIENT_JS = `
       frames[i].style.width=(1280*sc)+'px'; frames[i].style.height=(720*sc)+'px';
       var sec=frames[i].querySelector('section'); if(sec) sec.style.transform='scale('+sc+')';
     }
+    fitThumbs();
   }
+  // Thumbnails are responsive (flex:1, 16:9), so scale each preview section to its actual width.
+  function fitThumbs(){ for(var i=0;i<thumbs.length;i++){ var w=thumbs[i].clientWidth; if(w>0){ var s=thumbs[i].querySelector('section'); if(s) s.style.transform='scale('+(w/1280)+')'; } } }
   var pageNoEl=null;
   function pageNo(){ if(!pageNoEl){ pageNoEl=document.createElement('div'); pageNoEl.id='dc-pageno'; document.body.appendChild(pageNoEl); } return pageNoEl; }
   function updateCurrent(){
@@ -205,7 +208,7 @@ export const CLIENT_JS = `
   function applySlides(slides,rebuild){
     for(var i=0;i<frames.length;i++){ if(!slides[i]||lastSlideHtml[i]===slides[i].html) continue;
       if(rebuild) frames[i].innerHTML=slides[i].html;
-      if(thumbs[i]) thumbs[i].innerHTML='<span class="dc-no">'+(i+1)+'</span>'+stripIds(slides[i].html);
+      if(thumbs[i]) thumbs[i].innerHTML=stripIds(slides[i].html);
       lastSlideHtml[i]=slides[i].html;
     }
     if(rebuild){ fitAll(); var prev=sel?sel.getAttribute('data-cid'):null; clearSel(); if(prev){ var again=document.querySelector('#dc-stage [data-cid="'+prev+'"]'); if(again) select(again); } }
@@ -731,7 +734,7 @@ export const CLIENT_JS = `
         if(lastSlideHtml[i]===data.slides[i].html) continue;
         changed=true; lastSlideHtml[i]=data.slides[i].html;
         frames[i].innerHTML=data.slides[i].html;
-        if(thumbs[i]) thumbs[i].innerHTML='<span class="dc-no">'+(i+1)+'</span>'+stripIds(data.slides[i].html);
+        if(thumbs[i]) thumbs[i].innerHTML=stripIds(data.slides[i].html);
       }
       if(!changed){ refreshHist(); return; }
       fitAll(); clearSel();
