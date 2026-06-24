@@ -20,16 +20,20 @@ export const CHROME_CSS = `
 .dc-panel2{ display:none; padding:16px; }
 .dc-panel2.dc-on{ display:block; }
 .dc-panel2 h4{ margin:0 0 12px; font-size:12px; color:#9298a3; font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
-.dc-slidethumb{ display:block; width:240px; height:135px; margin:0 0 12px; padding:0; position:relative; border:2px solid #c7cbd3; border-radius:6px; overflow:hidden; background:#000; cursor:pointer; text-align:left; }
-.dc-slidethumb.dc-cur{ border-color:#ec5a13; }
+.dc-thumbrow{ display:flex; align-items:center; gap:9px; margin:0 0 12px; }
+.dc-thumbrow .dc-no{ width:16px; flex:none; text-align:right; color:#9298a3; font:600 12px/1 -apple-system,Segoe UI,sans-serif; }
+.dc-thumbrow.dc-cur .dc-no{ color:#ec5a13; }
+.dc-thumbrow.dc-cur .dc-slidethumb{ border-color:#ec5a13; }
+.dc-slidethumb{ display:block; width:240px; height:135px; padding:0; position:relative; border:2px solid #c7cbd3; border-radius:6px; overflow:hidden; background:#000; cursor:pointer; text-align:left; }
 .dc-slidethumb > section{ transform:scale(0.1875); transform-origin:top left; pointer-events:none; }
 .dc-slidethumb.dc-dragging{ opacity:0.35; }
 .dc-slidethumb.dc-drop-before{ box-shadow:0 -3px 0 0 #ec5a13; }
 .dc-slidethumb.dc-drop-after{ box-shadow:0 3px 0 0 #ec5a13; }
-#dc-add-slide{ display:flex; align-items:center; justify-content:center; gap:7px; width:240px; margin:2px 0 16px; padding:13px; border:1.5px dashed #c7cbd3; border-radius:8px; background:#fff; color:#5b606b; font-size:13px; font-weight:500; cursor:pointer; }
+#dc-add-slide{ display:flex; align-items:center; justify-content:center; gap:7px; width:240px; margin:2px 0 16px 25px; padding:13px; border:1.5px dashed #c7cbd3; border-radius:8px; background:#fff; color:#5b606b; font-size:13px; font-weight:500; cursor:pointer; }
 #dc-add-slide:hover{ border-color:#ec5a13; color:#ec5a13; }
 #dc-add-slide span{ font-size:17px; line-height:1; }
-.dc-slidethumb .dc-no{ position:absolute; top:4px; left:7px; color:#fff; font:11px sans-serif; opacity:.85; }
+#dc-pageno{ position:fixed; bottom:18px; transform:translateX(-50%); z-index:55; display:flex; align-items:center; gap:6px; background:rgba(16,18,24,.85); color:#fff; font:600 13px/1 -apple-system,Segoe UI,sans-serif; padding:9px 15px; border-radius:20px; pointer-events:none; box-shadow:0 4px 16px rgba(0,0,0,.18); }
+#dc-pageno b{ color:#ec5a13; }
 
 .dc-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .dc-el{ border:1px solid #e2e4e9; border-radius:10px; background:#fff; padding:0; cursor:pointer; overflow:hidden; text-align:center; }
@@ -131,11 +135,15 @@ export const CLIENT_JS = `
       var sec=frames[i].querySelector('section'); if(sec) sec.style.transform='scale('+sc+')';
     }
   }
+  var pageNoEl=null;
+  function pageNo(){ if(!pageNoEl){ pageNoEl=document.createElement('div'); pageNoEl.id='dc-pageno'; document.body.appendChild(pageNoEl); } return pageNoEl; }
   function updateCurrent(){
     var mid=stage.scrollTop+stage.clientHeight/2, best=0, bestD=1e9;
     for(var i=0;i<frames.length;i++){ var c=frames[i].offsetTop+frames[i].offsetHeight/2, d=Math.abs(c-mid); if(d<bestD){ bestD=d; best=i; } }
     cur=best; sessionStorage.setItem('dc-cur',String(cur));
-    for(var t=0;t<thumbs.length;t++) thumbs[t].classList.toggle('dc-cur',t===cur);
+    for(var t=0;t<thumbs.length;t++){ var row=thumbs[t].closest('.dc-thumbrow'); if(row) row.classList.toggle('dc-cur',t===cur); }
+    // floating "current slide" indicator over the scrollable stage (what the AI gets as the current slide)
+    var pn=pageNo(); pn.innerHTML='Slide <b>'+(cur+1)+'</b> / '+frames.length; var r=stage.getBoundingClientRect(); pn.style.left=(r.left+r.width/2)+'px';
   }
   function goTo(i){ var f=frames[i]; if(f) f.scrollIntoView({behavior:'smooth',block:'center'}); }
   function flash(m){ var h=document.getElementById('dc-flash'); h.textContent=m; h.style.opacity='1'; setTimeout(function(){ h.style.opacity='0'; },1600); }
@@ -323,7 +331,7 @@ export const CLIENT_JS = `
   function refreshSlideArrays(){
     frames=[].slice.call(document.querySelectorAll('#dc-stage .dc-frame'));
     thumbs=[].slice.call(thumbWrap.querySelectorAll('.dc-slidethumb'));
-    for(var i=0;i<thumbs.length;i++){ thumbs[i].setAttribute('data-idx',i); var no=thumbs[i].querySelector('.dc-no'); if(no) no.textContent=(i+1); }
+    for(var i=0;i<thumbs.length;i++){ thumbs[i].setAttribute('data-idx',i); var row=thumbs[i].closest('.dc-thumbrow'); var no=row?row.querySelector('.dc-no'):null; if(no) no.textContent=(i+1); }
     fitAll(); updateCurrent();
   }
   function reorderFramesToThumbs(){
@@ -342,7 +350,8 @@ export const CLIENT_JS = `
   }
   function reorderSlide(src,target,after){
     var sid=src.getAttribute('data-sid');
-    thumbWrap.insertBefore(src, after?target.nextSibling:target);
+    var srcRow=src.closest('.dc-thumbrow'), tgtRow=target.closest('.dc-thumbrow');
+    thumbWrap.insertBefore(srcRow, after?tgtRow.nextSibling:tgtRow);
     reorderFramesToThumbs(); refreshSlideArrays();
     var to=thumbs.indexOf(src);
     opInFlight++;
@@ -358,8 +367,10 @@ export const CLIENT_JS = `
       if(res&&res.error){ flash('error: '+res.error); return; }
       if(res&&res.slides){ var i=res.slides.length-1; var html=res.slides[i].html;
         var fr=document.createElement('div'); fr.className='dc-frame'; fr.innerHTML=html; stage.appendChild(fr);
+        var row=document.createElement('div'); row.className='dc-thumbrow';
+        var no=document.createElement('span'); no.className='dc-no'; no.textContent=(i+1); row.appendChild(no);
         var tb=document.createElement('button'); tb.className='dc-slidethumb'; tb.setAttribute('draggable','true'); tb.setAttribute('data-sid',res.newId);
-        tb.innerHTML='<span class="dc-no">'+(i+1)+'</span>'+stripIds(html); thumbWrap.appendChild(tb); wireThumb(tb); makeDraggable(tb);
+        tb.innerHTML=stripIds(html); row.appendChild(tb); thumbWrap.appendChild(row); wireThumb(tb); makeDraggable(tb);
         for(var k=0;k<res.slides.length;k++) lastSlideHtml[k]=res.slides[k].html;
         setHist(res); refreshSlideArrays(); goTo(i);
       }

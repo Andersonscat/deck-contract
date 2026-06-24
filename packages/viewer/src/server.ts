@@ -117,9 +117,9 @@ export function createViewerServer(opts: ViewerOptions) {
     const thumbs = slides
       .map(
         (s, i) =>
-          '<button class="dc-slidethumb' + (i === 0 ? " dc-cur" : "") + '" draggable="true" data-idx="' + i +
-          '" data-sid="' + s.id + '">' +
-          '<span class="dc-no">' + (i + 1) + "</span>" + strip(s.html) + "</button>",
+          '<div class="dc-thumbrow' + (i === 0 ? " dc-cur" : "") + '"><span class="dc-no">' + (i + 1) + "</span>" +
+          '<button class="dc-slidethumb" draggable="true" data-idx="' + i + '" data-sid="' + s.id + '">' +
+          strip(s.html) + "</button></div>",
       )
       .join("");
     const elGrid = (ids: string[]) => {
