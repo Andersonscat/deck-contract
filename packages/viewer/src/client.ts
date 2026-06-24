@@ -343,6 +343,10 @@ export const CLIENT_JS = `
   // rendered DOM: every [data-cid] is a real node; wrapper divs are transparent.
   function layersOn(){ var p=document.querySelector('.dc-panel2[data-panel="layers"]'); return !!(p&&p.classList.contains('dc-on')); }
   var LCOLLAPSED={};
+  // Layers shows the big containers; deeply-atomic groups (a bar's value/fill/label) start
+  // folded so the tree isn't flooded. Default: bars collapsed, everything else expanded —
+  // unless the user has explicitly toggled that row.
+  function lyrCollapsed(cid,el){ if(LCOLLAPSED.hasOwnProperty(cid)) return LCOLLAPSED[cid]; return el.getAttribute('data-type')==='bar'; }
   var LTYPE={ title:'Title', heading:'Heading', text:'Text', 'bullet-list':'List', 'stat-callout':'Metric', 'image-caption':'Image', 'bar-chart':'Bar chart', bar:'Bar', 'bar-value':'Value', 'bar-fill':'Fill', 'bar-label':'Label', table:'Table', 'two-column':'Columns', quote:'Quote' };
   function cidKids(el){ var out=[]; (function d(n){ for(var i=0;i<n.children.length;i++){ var c=n.children[i]; if(c.nodeType===1){ if(c.getAttribute('data-cid')) out.push(c); else d(c); } } })(el); return out; }
   function lyrName(el){ var t=el.getAttribute('data-type')||''; var base=LTYPE[t]||(t?cap(t):'Group'); var txt='';
@@ -366,10 +370,11 @@ export const CLIENT_JS = `
       var kids=cidKids(parent);
       for(var i=0;i<kids.length;i++){ (function(el){
         var gk=cidKids(el); var cid=el.getAttribute('data-cid');
+        var col=lyrCollapsed(cid,el);
         var row=document.createElement('div'); row.className='dc-layer'+(cid===selCid?' sel':''); row.setAttribute('data-cid',cid); row.style.paddingLeft=(6+depth*15)+'px';
         var tg=document.createElement('span'); tg.className='dc-lyr-tg';
-        function toggle(){ LCOLLAPSED[cid]=!LCOLLAPSED[cid]; buildLayers(); }
-        if(gk.length){ tg.textContent=LCOLLAPSED[cid]?'▸':'▾'; tg.title=LCOLLAPSED[cid]?'Expand':'Collapse'; tg.onclick=function(ev){ ev.stopPropagation(); toggle(); }; }
+        function toggle(){ LCOLLAPSED[cid]=!lyrCollapsed(cid,el); buildLayers(); }
+        if(gk.length){ tg.textContent=col?'▸':'▾'; tg.title=col?'Expand':'Collapse'; tg.onclick=function(ev){ ev.stopPropagation(); toggle(); }; }
         row.appendChild(tg);
         var ic=document.createElement('span'); ic.className='dc-lyr-ic'; ic.innerHTML=lyrIco(el); row.appendChild(ic);
         var nm=document.createElement('span'); nm.className='dc-lyr-nm'; nm.textContent=lyrName(el); row.appendChild(nm);
@@ -377,7 +382,7 @@ export const CLIENT_JS = `
         if(gk.length) row.ondblclick=function(ev){ ev.preventDefault(); toggle(); }; // double-click a container row to fold it, like a directory
         row.onmouseenter=function(){ showBox(el); }; row.onmouseleave=function(){ if(!dragging) hideBox(); };
         host.appendChild(row);
-        if(gk.length&&!LCOLLAPSED[cid]) rows(el,depth+1);
+        if(gk.length&&!col) rows(el,depth+1);
       })(kids[i]); }
     })(sec,0);
   }
