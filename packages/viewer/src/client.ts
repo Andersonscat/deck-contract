@@ -24,8 +24,10 @@ export const CHROME_CSS = `
 .dc-layer{ display:flex; align-items:center; gap:6px; height:28px; padding-right:8px; border-radius:6px; cursor:pointer; color:#3a3f4a; font-size:13px; white-space:nowrap; overflow:hidden; }
 .dc-layer:hover{ background:#f3f4f6; }
 .dc-layer.sel{ background:#ec5a13; color:#fff; }
-.dc-lyr-tg{ width:14px; flex:none; color:#9298a3; font-size:9px; text-align:center; }
+.dc-lyr-tg{ width:18px; height:22px; flex:none; color:#9298a3; font-size:10px; display:flex; align-items:center; justify-content:center; border-radius:4px; cursor:pointer; transition:color .1s,background .1s; }
+.dc-lyr-tg:hover{ color:#1f2330; background:rgba(0,0,0,.06); }
 .dc-layer.sel .dc-lyr-tg{ color:#fff; }
+.dc-layer.sel .dc-lyr-tg:hover{ background:rgba(255,255,255,.2); }
 .dc-lyr-ic{ width:15px; height:15px; flex:none; display:flex; align-items:center; justify-content:center; color:#6b7280; }
 .dc-layer.sel .dc-lyr-ic{ color:#fff; }
 .dc-lyr-nm{ overflow:hidden; text-overflow:ellipsis; }
@@ -362,11 +364,13 @@ export const CLIENT_JS = `
         var gk=cidKids(el); var cid=el.getAttribute('data-cid');
         var row=document.createElement('div'); row.className='dc-layer'+(cid===selCid?' sel':''); row.style.paddingLeft=(6+depth*15)+'px';
         var tg=document.createElement('span'); tg.className='dc-lyr-tg';
-        if(gk.length){ tg.textContent=LCOLLAPSED[cid]?'▸':'▾'; tg.onclick=function(ev){ ev.stopPropagation(); LCOLLAPSED[cid]=!LCOLLAPSED[cid]; buildLayers(); }; }
+        function toggle(){ LCOLLAPSED[cid]=!LCOLLAPSED[cid]; buildLayers(); }
+        if(gk.length){ tg.textContent=LCOLLAPSED[cid]?'▸':'▾'; tg.title=LCOLLAPSED[cid]?'Expand':'Collapse'; tg.onclick=function(ev){ ev.stopPropagation(); toggle(); }; }
         row.appendChild(tg);
         var ic=document.createElement('span'); ic.className='dc-lyr-ic'; ic.innerHTML=lyrIco(el); row.appendChild(ic);
         var nm=document.createElement('span'); nm.className='dc-lyr-nm'; nm.textContent=lyrName(el); row.appendChild(nm);
         row.onclick=function(){ select(el,{noTab:true}); };
+        if(gk.length) row.ondblclick=function(ev){ ev.preventDefault(); toggle(); }; // double-click a container row to fold it, like a directory
         row.onmouseenter=function(){ showBox(el); }; row.onmouseleave=function(){ if(!dragging) hideBox(); };
         host.appendChild(row);
         if(gk.length&&!LCOLLAPSED[cid]) rows(el,depth+1);
