@@ -197,12 +197,52 @@ function renderLeaf(node: DeckNode): string {
 }
 
 /**
- * A single bar = one addressable component (column) of a decomposed bar-chart: a plot area
- * whose rectangle is content.barValue (0..100%) tall, an optional value on top, and an
- * optional category label below. Each piece is editable on this ONE node by id —
- * set_content { barValue, value, label } and set_token { color } (the fill, via --bar-fill).
+ * A bar = one column of a bar-chart, itself decomposed into atomic, addressable sub-nodes:
+ *   bar-value (the number on top) · bar-fill (the orange rectangle) · bar-label (the category).
+ * Each atom has its own id, so the AI/user can recolour just the fill, retype just the value,
+ * etc. Legacy single-node bars (no children) still render via renderBarLegacy.
  */
 function renderBar(node: DeckNode): string {
+  const kids = node.children;
+  if (Array.isArray(kids)) {
+    const val = kids.find((k) => k.type === "bar-value");
+    const fillN = kids.find((k) => k.type === "bar-fill");
+    const lab = kids.find((k) => k.type === "bar-label");
+    const col = ["flex:1 1 0%", "min-width:0", "display:flex", "flex-direction:column", "align-items:center", "height:100%", "gap:6px"];
+    if (node.frame) col.unshift(frameToCss(node.frame));
+    const roleAttr = node.role ? ` data-role="${esc(node.role)}"` : "";
+    return (
+      `<div data-cid="${esc(node.id)}" data-type="bar"${roleAttr} style="${esc(col.join(";"))}">` +
+      (val ? renderBarText(val, "bar-value", "var(--color-text)", true) : "") +
+      `<div style="flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center;min-height:0">` +
+      (fillN ? renderBarFill(fillN) : "") +
+      `</div>` +
+      (lab ? renderBarText(lab, "bar-label", "var(--color-muted)", false) : "") +
+      `</div>`
+    );
+  }
+  return renderBarLegacy(node);
+}
+
+function renderBarText(n: DeckNode, type: string, fallback: string, bold: boolean): string {
+  const t = n.content?.text ?? "";
+  const color = n.style?.color ? tokenToVar(n.style.color) : fallback;
+  const roleAttr = n.role ? ` data-role="${esc(n.role)}"` : "";
+  return `<div data-cid="${esc(n.id)}" data-type="${type}"${roleAttr} style="font-size:13px;line-height:1;${bold ? "font-weight:700;" : ""}color:${color}">${esc(String(t))}</div>`;
+}
+
+function renderBarFill(n: DeckNode): string {
+  const v = Math.max(0, Math.min(100, Number(n.content?.barValue ?? 0)));
+  const fill = n.style?.color ?? n.style?.background;
+  const fillCss = fill ? tokenToVar(fill) : "var(--color-accent)";
+  const parts = ["width:64%", "max-width:54px", `height:${fmt(v)}%`, "min-height:2px", "background:var(--bar-fill)", "border-radius:6px 6px 0 0", `--bar-fill:${fillCss}`];
+  if (n.frame) parts.unshift(frameToCss(n.frame));
+  const roleAttr = n.role ? ` data-role="${esc(n.role)}"` : "";
+  return `<div data-cid="${esc(n.id)}" data-type="bar-fill"${roleAttr} style="${esc(parts.join(";"))}"></div>`;
+}
+
+/** The old monolithic bar: rect + optional value/label baked into one node (backward compat). */
+function renderBarLegacy(node: DeckNode): string {
   const c = node.content ?? {};
   const v = Math.max(0, Math.min(100, Number(c.barValue ?? 0)));
   const fill = node.style?.color ?? node.style?.background;
@@ -226,6 +266,7 @@ function renderBar(node: DeckNode): string {
 }
 
 function renderNode(node: DeckNode): string {
+  if (node.type === "bar") return renderBar(node);
   if (Array.isArray(node.children)) {
     return `<div${attrs(node)}>${node.children.map(renderNode).join("")}</div>`;
   }

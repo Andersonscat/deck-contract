@@ -63,8 +63,8 @@ export const CHROME_CSS = `
 #dc-stage{ flex:1; position:relative; overflow-y:auto; overflow-x:hidden; display:flex; flex-direction:column; align-items:center; gap:24px; padding:30px 0 60px; min-height:0; }
 .dc-frame{ display:block; flex:none; border:1px solid #aeb3bd; background:#000; }
 .dc-frame-sel{ outline:3px solid #ec5a13; outline-offset:3px; border-radius:4px; }
-#dc-stage .dc-entered [data-type="bar"]{ outline:1.5px dashed rgba(236,90,19,.75); outline-offset:2px; border-radius:5px; cursor:pointer; }
-#dc-stage .dc-entered [data-type="bar"]:hover{ outline-color:#ec5a13; background:rgba(236,90,19,.04); }
+#dc-stage .dc-atom{ outline:1.5px dashed rgba(236,90,19,.75); outline-offset:2px; border-radius:5px; cursor:pointer; }
+#dc-stage .dc-atom:hover{ outline-color:#ec5a13; background:rgba(236,90,19,.05); }
 .dc-frame > section{ transform-origin:top left; }
 #dc-stage [data-cid]{ cursor:grab; }
 #dc-stage section[data-cid]{ cursor:default; }
@@ -192,15 +192,16 @@ export const CLIENT_JS = `
   // contextual toolbar: which style props each component type exposes, and its text field
   function styleProps(type){
     if(type==='stat-callout') return {font:'valueFont',size:'valueSize',color:'valueColor'};
-    if(type==='bar') return {color:'color'};
-    if(type==='image-caption'||type==='slide'||type==='container'||type==='bar-chart') return {};
+    if(type==='bar-fill') return {color:'color'};
+    if(type==='bar-value'||type==='bar-label') return {font:'font',size:'size',color:'color'};
+    if(type==='image-caption'||type==='slide'||type==='container'||type==='bar-chart'||type==='bar') return {};
     return {font:'font',size:'size',color:'color'};
   }
   function contentField(type){
     if(type==='stat-callout') return 'value';
     if(type==='image-caption') return 'caption';
     if(type==='bullet-list') return 'items';
-    if(type==='title'||type==='heading') return 'text';
+    if(type==='title'||type==='heading'||type==='bar-value'||type==='bar-label') return 'text';
     return null;
   }
   function tokenKey(ref){ if(!ref) return ''; var m=/token:\\/\\/[a-z]+\\/([A-Za-z0-9-]+)/.exec(ref); return m?m[1]:''; }
@@ -215,7 +216,7 @@ export const CLIENT_JS = `
   function tokenToVarJS(ref){ var m=/^token:\\/\\/([a-z][a-z0-9]*)\\/([A-Za-z0-9][A-Za-z0-9-]*)$/.exec(ref); return m?'var(--'+m[1]+'-'+m[2]+')':ref; }
   function applyOptimistic(ops){
     for(var i=0;i<ops.length;i++){ var o=ops[i]; var el=document.querySelector('#dc-stage [data-cid="'+o.nodeId+'"]'); if(!el) return false;
-      if(o.op==='set_token'){ var cp=CSS_PROP[o.prop]||('--'+o.prop); if(o.prop==='color'&&el.getAttribute('data-type')==='bar') cp='--bar-fill'; el.style.setProperty(cp, tokenToVarJS(o.value)); }
+      if(o.op==='set_token'){ var cp=CSS_PROP[o.prop]||('--'+o.prop); if(o.prop==='color'&&el.getAttribute('data-type')==='bar-fill') cp='--bar-fill'; el.style.setProperty(cp, tokenToVarJS(o.value)); }
       else if(o.op==='set_align'){ el.style.textAlign=o.value; }
       else if(o.op==='set_frame'){ var f=o.frame; el.style.position='absolute'; el.style.left=f.x+'%'; el.style.top=f.y+'%'; if(f.w!=null) el.style.width=f.w+'%'; if(f.h!=null) el.style.height=f.h+'%'; }
       else if(o.op==='move_to'){ el.style.left=o.x+'%'; el.style.top=o.y+'%'; }
@@ -342,10 +343,10 @@ export const CLIENT_JS = `
   // rendered DOM: every [data-cid] is a real node; wrapper divs are transparent.
   function layersOn(){ var p=document.querySelector('.dc-panel2[data-panel="layers"]'); return !!(p&&p.classList.contains('dc-on')); }
   var LCOLLAPSED={};
-  var LTYPE={ title:'Title', heading:'Heading', text:'Text', 'bullet-list':'List', 'stat-callout':'Metric', 'image-caption':'Image', 'bar-chart':'Bar chart', bar:'Bar', table:'Table', 'two-column':'Columns', quote:'Quote' };
+  var LTYPE={ title:'Title', heading:'Heading', text:'Text', 'bullet-list':'List', 'stat-callout':'Metric', 'image-caption':'Image', 'bar-chart':'Bar chart', bar:'Bar', 'bar-value':'Value', 'bar-fill':'Fill', 'bar-label':'Label', table:'Table', 'two-column':'Columns', quote:'Quote' };
   function cidKids(el){ var out=[]; (function d(n){ for(var i=0;i<n.children.length;i++){ var c=n.children[i]; if(c.nodeType===1){ if(c.getAttribute('data-cid')) out.push(c); else d(c); } } })(el); return out; }
   function lyrName(el){ var t=el.getAttribute('data-type')||''; var base=LTYPE[t]||(t?cap(t):'Group'); var txt='';
-    if(t==='title'||t==='heading'||t==='text'||t==='bar'||t==='stat-callout') txt=(el.textContent||'').replace(/\\s+/g,' ').trim();
+    if(t==='title'||t==='heading'||t==='text'||t==='bar-value'||t==='bar-label'||t==='stat-callout') txt=(el.textContent||'').replace(/\\s+/g,' ').trim();
     if(txt) base+=' · '+(txt.length>20?txt.slice(0,19)+'…':txt); return base; }
   var ICO={
     text:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7V5h16v2"/><path d="M12 5v14"/><path d="M9 19h6"/></svg>',
@@ -356,7 +357,7 @@ export const CLIENT_JS = `
     list:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r=".7"/><circle cx="4" cy="12" r=".7"/><circle cx="4" cy="18" r=".7"/></svg>',
     group:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>',
     metric:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 17l4-10 3 6 2-3 5 7"/></svg>' };
-  function lyrIco(el){ var t=el.getAttribute('data-type')||''; if(t==='title'||t==='heading'||t==='text') return ICO.text; if(t==='image-caption') return ICO.img; if(t==='bar-chart') return ICO.chart; if(t==='bar') return ICO.bar; if(t==='table') return ICO.table; if(t==='bullet-list') return ICO.list; if(t==='stat-callout') return ICO.metric; return ICO.group; }
+  function lyrIco(el){ var t=el.getAttribute('data-type')||''; if(t==='title'||t==='heading'||t==='text'||t==='bar-value'||t==='bar-label') return ICO.text; if(t==='image-caption') return ICO.img; if(t==='bar-chart') return ICO.chart; if(t==='bar'||t==='bar-fill') return ICO.bar; if(t==='table') return ICO.table; if(t==='bullet-list') return ICO.list; if(t==='stat-callout') return ICO.metric; return ICO.group; }
   function buildLayers(){
     var host=document.getElementById('dc-layers'); if(!host) return; host.innerHTML='';
     var f=frames[cur]; var sec=f&&f.querySelector('section'); if(!sec) return;
@@ -561,18 +562,28 @@ export const CLIENT_JS = `
   }; })(sw[s]); }
 
   // select / edit on the stage
-  // Composite components (e.g. bar-chart) are selected as ONE unit on a single click; a
-  // double-click drills in to the individual sub-component (a bar) so you can edit just it.
-  var GROUP_TYPES=['bar-chart'];
+  // Nested composite components drill in one level per click: bar-chart -> bar -> atom
+  // (bar-fill / bar-value / bar-label). Both bar-chart and bar are "groups" you can enter.
+  var GROUP_TYPES=['bar-chart','bar'];
+  function isGroup(el){ return el&&GROUP_TYPES.indexOf(el.getAttribute('data-type'))>=0; }
   function selectTarget(el){ var n=el, group=null; while(n&&n.tagName!=='SECTION'){ if(GROUP_TYPES.indexOf(n.getAttribute('data-type'))>=0) group=n; var p=n.parentElement; n=p?p.closest('#dc-stage [data-cid]'):null; } return group||el; }
   function closestGroup(el){ var n=el, group=null; while(n&&n.tagName!=='SECTION'){ if(GROUP_TYPES.indexOf(n.getAttribute('data-type'))>=0) group=n; var p=n.parentElement; n=p?p.closest('#dc-stage [data-cid]'):null; } return group; }
-  // Drill-in: clicking a group (bar-chart) "enters" it and decomposes it into its parts
-  // (each bar gets a dashed outline); while entered, a click selects the individual part.
+  function directChild(container,el){ var n=el; while(n&&n!==container){ var pc=n.parentElement?n.parentElement.closest('#dc-stage [data-cid]'):null; if(pc===container) return n; n=pc; } return null; }
+  function parentGroup(el){ var p=el.parentElement?el.parentElement.closest('#dc-stage [data-cid]'):null; while(p){ if(isGroup(p)) return p; p=p.parentElement?p.parentElement.closest('#dc-stage [data-cid]'):null; } return null; }
+  // Drill-in: entering a container decomposes it — each DIRECT child gets a dashed outline
+  // (.dc-atom); a click then selects that child. Entered group is tracked by enteredCid.
   var enteredCid=null;
-  function clearEntered(){ var e=document.querySelectorAll('#dc-stage .dc-entered'); for(var i=0;i<e.length;i++) e[i].classList.remove('dc-entered'); enteredCid=null; }
-  function markEntered(grp){ clearEntered(); grp.classList.add('dc-entered'); enteredCid=grp.getAttribute('data-cid'); }
-  // What a pointer at el targets, honouring the entered group (the part, not the whole group).
-  function resolveTarget(el){ if(!el||el.tagName==='SECTION') return el; var g=closestGroup(el); if(g&&enteredCid===g.getAttribute('data-cid')) return el; return g||el; }
+  function clearEntered(){ var e=document.querySelectorAll('#dc-stage .dc-entered'); for(var i=0;i<e.length;i++) e[i].classList.remove('dc-entered'); var a=document.querySelectorAll('#dc-stage .dc-atom'); for(var j=0;j<a.length;j++) a[j].classList.remove('dc-atom'); enteredCid=null; }
+  function markEntered(container){ clearEntered(); container.classList.add('dc-entered'); var kids=cidKids(container); for(var i=0;i<kids.length;i++) kids[i].classList.add('dc-atom'); enteredCid=container.getAttribute('data-cid'); }
+  // The unit a pointer at el targets, given the entered container: its direct child on the
+  // path to el; a sibling resolves at the entered container's own level; else the top group.
+  function resolveTarget(el){
+    if(!el||el.tagName==='SECTION') return el;
+    if(enteredCid){ var ent=document.querySelector('#dc-stage [data-cid="'+enteredCid+'"]');
+      if(ent){ if(ent!==el&&ent.contains(el)){ var dc=directChild(ent,el); if(dc) return dc; }
+        var ep=parentGroup(ent); if(ep&&el!==ep&&ep.contains(el)){ var dc2=directChild(ep,el); if(dc2) return dc2; } } }
+    return closestGroup(el)||el;
+  }
   document.addEventListener('click',function(e){
     if(dragged){ dragged=false; return; }
     if(e.target.closest('#dc-topbar')||e.target.closest('#dc-left')||e.target.closest('#dc-right')) return;
@@ -580,13 +591,9 @@ export const CLIENT_JS = `
     if(!el){ clearEntered(); clearSel(); return; } // empty stage gutter -> deselect + exit any group
     e.preventDefault();
     if(el.tagName==='SECTION'){ clearEntered(); select(el); return; } // the slide itself
-    var grp=closestGroup(el);
-    if(grp){
-      if(enteredCid!==grp.getAttribute('data-cid')){ select(grp); markEntered(grp); } // 1st click: select chart + decompose it
-      else { select(el); } // already entered: select the clicked part (a bar)
-      return;
-    }
-    clearEntered(); select(selectTarget(el));
+    var t=resolveTarget(el);
+    if(isGroup(t)&&enteredCid!==t.getAttribute('data-cid')){ markEntered(t); select(t); } // enter this group + decompose it
+    else select(t); // an atom (or already-entered group's content)
   });
   // hover frame + free drag (move by coordinates -> set_frame / move_to)
   var dragHover=null, candEl=null, downPt=null, dragging=false, dragNode=null, dragged=false;
@@ -816,7 +823,7 @@ export const CLIENT_JS = `
 
   // close any open custom dropdown when clicking elsewhere
   document.addEventListener('click',function(e){ if(e.target.closest('.dc-dd')) return; var m=document.querySelectorAll('.dc-dd-menu.on'); for(var i=0;i<m.length;i++) m[i].classList.remove('on'); });
-  document.addEventListener('dblclick',function(e){ var el=e.target.closest('#dc-stage [data-cid]'); if(!el||el.tagName==='SECTION') return; var type=el.getAttribute('data-type'); e.preventDefault(); if(type==='title'||type==='heading') editText(el); else select(el); });
+  document.addEventListener('dblclick',function(e){ var el=e.target.closest('#dc-stage [data-cid]'); if(!el||el.tagName==='SECTION') return; var type=el.getAttribute('data-type'); e.preventDefault(); if(type==='title'||type==='heading'||type==='bar-value'||type==='bar-label') editText(el); else select(el); });
 
   // AI chat — tells the model which slide is in view
   var chat=document.getElementById('dc-chat');

@@ -118,61 +118,165 @@
           "id": "bc_bar1",
           "type": "bar",
           "role": "bar",
-          "content": {
-            "barValue": 42,
-            "value": "42",
-            "label": "Q1"
-          },
-          "style": {
-            "color": "token://color/accent",
-            "labelColor": "token://color/muted",
-            "valueColor": "token://color/text"
-          }
+          "content": {},
+          "children": [
+            {
+              "id": "bc_bar1_v",
+              "type": "bar-value",
+              "role": "bar-value",
+              "content": {
+                "text": "42"
+              },
+              "style": {
+                "color": "token://color/text"
+              }
+            },
+            {
+              "id": "bc_bar1_f",
+              "type": "bar-fill",
+              "role": "bar-fill",
+              "content": {
+                "barValue": 42
+              },
+              "style": {
+                "color": "token://color/accent"
+              }
+            },
+            {
+              "id": "bc_bar1_l",
+              "type": "bar-label",
+              "role": "bar-label",
+              "content": {
+                "text": "Q1"
+              },
+              "style": {
+                "color": "token://color/muted"
+              }
+            }
+          ]
         },
         {
           "id": "bc_bar2",
           "type": "bar",
           "role": "bar",
-          "content": {
-            "barValue": 61,
-            "value": "61",
-            "label": "Q2"
-          },
-          "style": {
-            "color": "token://color/accent",
-            "labelColor": "token://color/muted",
-            "valueColor": "token://color/text"
-          }
+          "content": {},
+          "children": [
+            {
+              "id": "bc_bar2_v",
+              "type": "bar-value",
+              "role": "bar-value",
+              "content": {
+                "text": "61"
+              },
+              "style": {
+                "color": "token://color/text"
+              }
+            },
+            {
+              "id": "bc_bar2_f",
+              "type": "bar-fill",
+              "role": "bar-fill",
+              "content": {
+                "barValue": 61
+              },
+              "style": {
+                "color": "token://color/accent"
+              }
+            },
+            {
+              "id": "bc_bar2_l",
+              "type": "bar-label",
+              "role": "bar-label",
+              "content": {
+                "text": "Q2"
+              },
+              "style": {
+                "color": "token://color/muted"
+              }
+            }
+          ]
         },
         {
           "id": "bc_bar3",
           "type": "bar",
           "role": "bar",
-          "content": {
-            "barValue": 78,
-            "value": "78",
-            "label": "Q3"
-          },
-          "style": {
-            "color": "token://color/accent",
-            "labelColor": "token://color/muted",
-            "valueColor": "token://color/text"
-          }
+          "content": {},
+          "children": [
+            {
+              "id": "bc_bar3_v",
+              "type": "bar-value",
+              "role": "bar-value",
+              "content": {
+                "text": "78"
+              },
+              "style": {
+                "color": "token://color/text"
+              }
+            },
+            {
+              "id": "bc_bar3_f",
+              "type": "bar-fill",
+              "role": "bar-fill",
+              "content": {
+                "barValue": 78
+              },
+              "style": {
+                "color": "token://color/accent"
+              }
+            },
+            {
+              "id": "bc_bar3_l",
+              "type": "bar-label",
+              "role": "bar-label",
+              "content": {
+                "text": "Q3"
+              },
+              "style": {
+                "color": "token://color/muted"
+              }
+            }
+          ]
         },
         {
           "id": "bc_bar4",
           "type": "bar",
           "role": "bar",
-          "content": {
-            "barValue": 100,
-            "value": "100",
-            "label": "Q4"
-          },
-          "style": {
-            "color": "token://color/accent",
-            "labelColor": "token://color/muted",
-            "valueColor": "token://color/text"
-          }
+          "content": {},
+          "children": [
+            {
+              "id": "bc_bar4_v",
+              "type": "bar-value",
+              "role": "bar-value",
+              "content": {
+                "text": "100"
+              },
+              "style": {
+                "color": "token://color/text"
+              }
+            },
+            {
+              "id": "bc_bar4_f",
+              "type": "bar-fill",
+              "role": "bar-fill",
+              "content": {
+                "barValue": 100
+              },
+              "style": {
+                "color": "token://color/accent"
+              }
+            },
+            {
+              "id": "bc_bar4_l",
+              "type": "bar-label",
+              "role": "bar-label",
+              "content": {
+                "text": "Q4"
+              },
+              "style": {
+                "color": "token://color/muted"
+              }
+            }
+          ]
         }
       ]
     },

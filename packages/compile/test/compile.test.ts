@@ -105,4 +105,39 @@ describe("compileHtml", () => {
     expect(html).toContain("--bar-fill:var(--color-muted)");
     expect(html).toContain("background:var(--bar-fill)");
   });
+
+  it("renders a bar decomposed into atomic sub-nodes (value, fill, label)", () => {
+    const deck = parseDeck(makeDeck());
+    deck.slides[0]!.children!.push({
+      id: "chart2",
+      type: "bar-chart",
+      frame: { x: 10, y: 30, w: 60, h: 40 },
+      layout: { direction: "row" },
+      children: [
+        {
+          id: "col1",
+          type: "bar",
+          children: [
+            { id: "col1_v", type: "bar-value", content: { text: "42" } },
+            { id: "col1_f", type: "bar-fill", content: { barValue: 42 }, style: { color: "token://color/accent" } },
+            { id: "col1_l", type: "bar-label", content: { text: "Q1" } },
+          ],
+        },
+      ],
+    } as never);
+    const { html } = compileHtml(deck);
+    // every atom is its own addressable node
+    expect(html).toContain('data-cid="col1_v"');
+    expect(html).toContain('data-cid="col1_f"');
+    expect(html).toContain('data-cid="col1_l"');
+    expect(html).toContain('data-type="bar-value"');
+    expect(html).toContain('data-type="bar-fill"');
+    expect(html).toContain('data-type="bar-label"');
+    // the fill keeps its height + token-only colour
+    expect(html).toContain("height:42%");
+    expect(html).toContain("--bar-fill:var(--color-accent)");
+    // value/label text shows
+    expect(html).toContain(">42</div>");
+    expect(html).toContain(">Q1</div>");
+  });
 });

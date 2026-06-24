@@ -462,61 +462,165 @@
               "id": "bar_q1",
               "type": "bar",
               "role": "bar",
-              "content": {
-                "barValue": 32,
-                "value": "12",
-                "label": "Q1"
-              },
-              "style": {
-                "color": "token://color/accent",
-                "labelColor": "token://color/muted",
-                "valueColor": "token://color/text"
-              }
+              "content": {},
+              "children": [
+                {
+                  "id": "bar_q1_v",
+                  "type": "bar-value",
+                  "role": "bar-value",
+                  "content": {
+                    "text": "12"
+                  },
+                  "style": {
+                    "color": "token://color/text"
+                  }
+                },
+                {
+                  "id": "bar_q1_f",
+                  "type": "bar-fill",
+                  "role": "bar-fill",
+                  "content": {
+                    "barValue": 32
+                  },
+                  "style": {
+                    "color": "token://color/accent"
+                  }
+                },
+                {
+                  "id": "bar_q1_l",
+                  "type": "bar-label",
+                  "role": "bar-label",
+                  "content": {
+                    "text": "Q1"
+                  },
+                  "style": {
+                    "color": "token://color/muted"
+                  }
+                }
+              ]
             },
             {
               "id": "bar_q2",
               "type": "bar",
               "role": "bar",
-              "content": {
-                "barValue": 50,
-                "value": "19",
-                "label": "Q2"
-              },
-              "style": {
-                "color": "token://color/accent",
-                "labelColor": "token://color/muted",
-                "valueColor": "token://color/text"
-              }
+              "content": {},
+              "children": [
+                {
+                  "id": "bar_q2_v",
+                  "type": "bar-value",
+                  "role": "bar-value",
+                  "content": {
+                    "text": "19"
+                  },
+                  "style": {
+                    "color": "token://color/text"
+                  }
+                },
+                {
+                  "id": "bar_q2_f",
+                  "type": "bar-fill",
+                  "role": "bar-fill",
+                  "content": {
+                    "barValue": 50
+                  },
+                  "style": {
+                    "color": "token://color/accent"
+                  }
+                },
+                {
+                  "id": "bar_q2_l",
+                  "type": "bar-label",
+                  "role": "bar-label",
+                  "content": {
+                    "text": "Q2"
+                  },
+                  "style": {
+                    "color": "token://color/muted"
+                  }
+                }
+              ]
             },
             {
               "id": "bar_q3",
               "type": "bar",
               "role": "bar",
-              "content": {
-                "barValue": 71,
-                "value": "27",
-                "label": "Q3"
-              },
-              "style": {
-                "color": "token://color/accent",
-                "labelColor": "token://color/muted",
-                "valueColor": "token://color/text"
-              }
+              "content": {},
+              "children": [
+                {
+                  "id": "bar_q3_v",
+                  "type": "bar-value",
+                  "role": "bar-value",
+                  "content": {
+                    "text": "27"
+                  },
+                  "style": {
+                    "color": "token://color/text"
+                  }
+                },
+                {
+                  "id": "bar_q3_f",
+                  "type": "bar-fill",
+                  "role": "bar-fill",
+                  "content": {
+                    "barValue": 71
+                  },
+                  "style": {
+                    "color": "token://color/accent"
+                  }
+                },
+                {
+                  "id": "bar_q3_l",
+                  "type": "bar-label",
+                  "role": "bar-label",
+                  "content": {
+                    "text": "Q3"
+                  },
+                  "style": {
+                    "color": "token://color/muted"
+                  }
+                }
+              ]
             },
             {
               "id": "bar_q4",
               "type": "bar",
               "role": "bar",
-              "content": {
-                "barValue": 100,
-                "value": "38",
-                "label": "Q4"
-              },
-              "style": {
-                "color": "token://color/accent",
-                "labelColor": "token://color/muted",
-                "valueColor": "token://color/text"
-              }
+              "content": {},
+              "children": [
+                {
+                  "id": "bar_q4_v",
+                  "type": "bar-value",
+                  "role": "bar-value",
+                  "content": {
+                    "text": "38"
+                  },
+                  "style": {
+                    "color": "token://color/text"
+                  }
+                },
+                {
+                  "id": "bar_q4_f",
+                  "type": "bar-fill",
+                  "role": "bar-fill",
+                  "content": {
+                    "barValue": 100
+                  },
+                  "style": {
+                    "color": "token://color/accent"
+                  }
+                },
+                {
+                  "id": "bar_q4_l",
+                  "type": "bar-label",
+                  "role": "bar-label",
+                  "content": {
+                    "text": "Q4"
+                  },
+                  "style": {
+                    "color": "token://color/muted"
+                  }
+                }
+              ]
             }
           ]
         }

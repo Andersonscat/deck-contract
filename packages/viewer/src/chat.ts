@@ -13,7 +13,7 @@ export interface ChatResult {
 
 function preview(node: DeckNode): string {
   const c = node.content ?? {};
-  if (node.type === "bar") return `${c.label ? c.label + " " : ""}${c.barValue ?? "?"}%`;
+  if (node.type === "bar-fill") return `${c.barValue ?? "?"}%`;
   const t = c.text ?? c.items?.[0] ?? c.value ?? c.caption ?? "";
   return t.length > 50 ? t.slice(0, 47) + "…" : t;
 }
@@ -71,7 +71,7 @@ export async function runChat(
     "- stat-callout (role key-metric): a big metric. Words: метрика, число, показатель, KPI. Edit: set_content { value, label, delta }.",
     "- image-caption (role visual): image + caption. Words: картинка, изображение, image. Edit: set_content { src, alt, caption }.",
     "- bar-chart (role chart): a CONTAINER whose children are individual `bar` components (one per column), in order. Words: график, диаграмма, chart, bar chart.",
-    "- bar (role bar): ONE column of a bar-chart, individually addressable by its id. It owns content.barValue (height 0..100), content.value (the number shown on top), content.label (the category under it), and style.color (its fill). \"the third bar / третий столбец\" = the 3rd `bar` child of that chart, in order. Edit ONE bar: set_token {prop:color} to recolour it; set_content { barValue, value, label } to change its height / number / caption. Keep the other bars untouched unless asked.",
+    "- bar (role bar): ONE column of a bar-chart, a CONTAINER decomposed into three atomic children, each individually addressable by id: bar-value (the number on top, content.text), bar-fill (the rectangle — content.barValue height 0..100, style.color the fill), bar-label (the category underneath, content.text). \"the third bar / третий столбец\" = the 3rd `bar` child of the chart, in order; its atoms are that bar's children. To recolour a column: set_token {prop:color} on its bar-fill. To change its height: set_content {barValue} on the bar-fill. To change the number/label: set_content {text} on its bar-value / bar-label. Touch only the atoms you're asked to.",
     "",
     "Rules: style/colors only via set_token / format_range with theme tokens (never raw hex/px). Only edit nodes that exist.",
     'To recolour/restyle ONE word, letter, or phrase INSIDE a text (e.g. "make the word build orange"), use format_range with target {match:"build"} — the server finds the character offsets itself; never compute offsets by hand. Use set_token only when the user means the WHOLE text node.',
