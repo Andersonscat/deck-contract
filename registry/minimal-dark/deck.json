@@ -263,7 +263,7 @@
           "id": "why_image",
           "type": "image-caption",
           "content": {
-            "src": "asset://images/diagram.png",
+            "src": "https://picsum.photos/seed/whynow/720/480",
             "alt": "architecture",
             "caption": "Functional core / thin shell"
           },

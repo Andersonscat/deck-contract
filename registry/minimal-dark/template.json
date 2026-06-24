@@ -57,14 +57,19 @@
       "type": "image-caption",
       "role": "visual",
       "content": {
-        "src": "asset://images/placeholder.png",
-        "alt": "image",
+        "src": "https://picsum.photos/seed/deck/960/540",
+        "alt": "Photo",
         "caption": "Caption"
       },
       "style": {
         "radius": "token://radius/md",
         "captionColor": "token://color/muted",
         "captionSize": "token://type/caption"
+      },
+      "frame": {
+        "x": 28,
+        "y": 22,
+        "w": 44
       }
     },
     "heading": {
