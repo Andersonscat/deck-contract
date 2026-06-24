@@ -850,7 +850,9 @@ export const CLIENT_JS = `
     var msg=ci.value.trim(); if(!msg) return;
     ci.value=''; autoGrow(); addMsg('user',msg); var pending=addMsg('sys','…');
     var selId=sel?sel.getAttribute('data-cid'):null;
-    post('/api/chat',{message:msg,currentSlideId:curSlideId(),selectedId:selId}).then(function(res){ pending.remove(); addMsg('ai',res.reply||'(no reply)'); if(res.applied){ flash('applied '+res.applied+' edit(s)'); } }).catch(function(err){ pending.remove(); addMsg('sys','error: '+err); });
+    // pass the selected element's box (as % of its slide) so a generated image can land exactly where it was
+    var selBox=null; if(sel&&sel.tagName!=='SECTION'){ var sc=sel.closest('section'); if(sc){ var sb=sc.getBoundingClientRect(), eb=sel.getBoundingClientRect(); if(sb.width&&sb.height) selBox={x:round3((eb.left-sb.left)/sb.width*100),y:round3((eb.top-sb.top)/sb.height*100),w:round3(eb.width/sb.width*100),h:round3(eb.height/sb.height*100)}; } }
+    post('/api/chat',{message:msg,currentSlideId:curSlideId(),selectedId:selId,selBox:selBox}).then(function(res){ pending.remove(); addMsg('ai',res.reply||'(no reply)'); if(res.applied){ flash('applied '+res.applied+' edit(s)'); } }).catch(function(err){ pending.remove(); addMsg('sys','error: '+err); });
   });
 
   // Soft re-render: patch the slide DOM in place instead of reloading the page, so

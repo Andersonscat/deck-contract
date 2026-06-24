@@ -1,11 +1,13 @@
 import { createServer as createHttp, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { watch, type FSWatcher } from "node:fs";
+import { join, dirname } from "node:path";
 import { parseDeck, type Deck, type DeckNode } from "@deck/contract";
 import { compileSlides } from "@deck/compile";
 import { apply, parseOps, cloneWithNewIds, buildIndex, type Op } from "@deck/core";
 import { CHROME_CSS, CLIENT_JS } from "./client.js";
 import { runChat } from "./chat.js";
+import { generateImage } from "./imagegen.js";
 
 /**
  * Local Canva-style editor: left rail/panels, center slide canvas, right AI chat.
@@ -71,7 +73,19 @@ function body(req: IncomingMessage): Promise<string> {
 export function createViewerServer(opts: ViewerOptions) {
   const port = opts.port ?? 4570;
   const apiKey = opts.apiKey ?? process.env.ANTHROPIC_API_KEY;
+  const openaiKey = process.env.OPENAI_API_KEY;
   const clients = new Set<ServerResponse>();
+
+  // Generated images are cached next to the deck and served from /assets, so the deck just
+  // stores a stable local src (compile stays pure).
+  const assetsDir = join(dirname(opts.deckPath), "assets");
+  let assetSeq = 0;
+  const saveAsset = async (buf: Buffer): Promise<string> => {
+    await mkdir(assetsDir, { recursive: true });
+    const file = "gen_" + Date.now().toString(36) + "_" + (assetSeq++).toString(36) + ".png";
+    await writeFile(join(assetsDir, file), buf);
+    return "/assets/" + file;
+  };
 
   const readDeck = async () => parseDeck(JSON.parse(await readFile(opts.deckPath, "utf8")));
   const readBlocks = async (): Promise<Record<string, DeckNode>> => {
@@ -102,6 +116,48 @@ export function createViewerServer(opts: ViewerOptions) {
     await writeDeck(next);
     undoStack.push(inverse);
     redoStack.length = 0;
+  };
+
+  // Expand any high-level `generate_image` ops the AI emitted into real image-caption
+  // inserts/replaces, calling the image model and caching the bytes. Other ops pass through.
+  const expandGenOps = async (
+    ops: unknown[],
+    deck: Deck,
+    currentSlideId?: string,
+    selBox?: unknown,
+    selId?: string,
+  ): Promise<unknown[]> => {
+    const out: unknown[] = [];
+    const idx = buildIndex(deck);
+    for (const raw of ops) {
+      const op = raw as { op?: string; prompt?: string; target?: string; mode?: string; parentId?: string; index?: number; frame?: unknown };
+      if (op && op.op === "generate_image") {
+        if (!openaiKey) throw new Error("image generation needs OPENAI_API_KEY");
+        const prompt = String(op.prompt ?? "").trim();
+        if (!prompt) continue;
+        const buf = await generateImage(prompt, openaiKey);
+        const src = await saveAsset(buf);
+        const newId = "img_" + Date.now().toString(36) + "_" + Math.floor(Math.random() * 1e7).toString(36);
+        const target = op.target ? idx.get(op.target) : undefined;
+        // Prefer the on-screen box of the thing being replaced, so the image lands where it was.
+        const replacedBox = op.target && op.target === selId ? selBox : undefined;
+        const frame = (op.frame as object) ?? replacedBox ?? target?.node.frame ?? { x: 30, y: 26, w: 40, h: 44 };
+        const alt = prompt.slice(0, 80);
+        const imgNode: DeckNode = { id: newId, type: "image-caption", role: "visual", content: { src, alt }, frame } as DeckNode;
+        if (op.mode === "replace" && target) {
+          if (target.node.type === "image-caption") {
+            out.push({ op: "set_content", nodeId: op.target, content: { src, alt } });
+          } else {
+            out.push({ op: "remove_node", nodeId: op.target });
+            out.push({ op: "insert_node", parentId: target.slideId, index: 999, node: imgNode });
+          }
+        } else {
+          const parentId = op.parentId ?? currentSlideId ?? deck.slides[0]?.id;
+          out.push({ op: "insert_node", parentId, index: op.index ?? 999, node: imgNode });
+        }
+      } else out.push(raw);
+    }
+    return out;
   };
 
   async function buildPage(): Promise<string> {
@@ -188,6 +244,19 @@ export function createViewerServer(opts: ViewerOptions) {
       if (req.method === "GET" && (url === "/" || url.startsWith("/?"))) {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(await buildPage());
+        return;
+      }
+      if (req.method === "GET" && url.startsWith("/assets/")) {
+        const name = url.slice("/assets/".length).split("?")[0]!;
+        if (/[^a-zA-Z0-9._-]/.test(name)) return json({ error: "bad asset" }, 400);
+        try {
+          const buf = await readFile(join(assetsDir, name));
+          res.writeHead(200, { "content-type": "image/png", "cache-control": "max-age=31536000" });
+          res.end(buf);
+        } catch {
+          res.writeHead(404);
+          res.end("not found");
+        }
         return;
       }
       if (req.method === "GET" && url === "/api/deck") return json(await readDeck());
@@ -321,18 +390,20 @@ export function createViewerServer(opts: ViewerOptions) {
         return json({ ok: true });
       }
       if (req.method === "POST" && url === "/api/chat") {
-        const { message, currentSlideId, selectedId } = JSON.parse(await body(req));
+        const { message, currentSlideId, selectedId, selBox } = JSON.parse(await body(req));
         if (!apiKey) return json({ reply: "AI chat disabled: set ANTHROPIC_API_KEY.", applied: 0 });
         try {
           const deck = await readDeck();
           const selection = selectedId ? { nodeId: selectedId } : await readSelection();
-          const { reply, ops } = await runChat(message, deck, selection, apiKey, currentSlideId);
+          const { reply, ops } = await runChat(message, deck, selection, apiKey, currentSlideId, undefined, !!openaiKey);
+          const expanded = await expandGenOps(ops, deck, currentSlideId, selBox, selectedId);
           let applied = 0;
-          if (ops.length) {
-            await commit(ops);
-            applied = ops.length;
+          if (expanded.length) {
+            await commit(expanded);
+            applied = expanded.length;
           }
-          return json({ reply, applied, ...hist() });
+          const { slides } = compileSlides(await readDeck());
+          return json({ reply, applied, ...hist(), slides });
         } catch (e) {
           return json({ reply: "error: " + (e instanceof Error ? e.message : String(e)), applied: 0 });
         }

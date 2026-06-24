@@ -48,6 +48,7 @@ export async function runChat(
   apiKey: string,
   currentSlideId?: string,
   model = "claude-haiku-4-5",
+  imagesEnabled = false,
 ): Promise<ChatResult> {
   const selectedNode = selection ? buildIndex(deck).get(selection.nodeId)?.node : undefined;
 
@@ -62,6 +63,11 @@ export async function runChat(
     '- {"op":"insert_node","parentId":ID,"index":N,"node":{...}}',
     '- {"op":"remove_node","nodeId":ID}',
     '- {"op":"move_node","nodeId":ID,"newParentId":ID,"index":N}',
+    ...(imagesEnabled
+      ? [
+          '- {"op":"generate_image","prompt":STRING,"mode":"insert"|"replace","target":ID}   (GENERATE a real picture and place it. Use this for ANY "make/draw/add a picture of X" or "turn this into X / поменяй на X". mode:"replace" + target=the node to become the picture (the selected node if the user pointed at one); mode:"insert" to add a new picture to the current slide. The prompt is a vivid ENGLISH image description; add style cues to match a dark, minimal, modern deck. NEVER fake an image request by writing the word into a text/label field — always use this op.)',
+        ]
+      : []),
     "",
     "Component types and the words users use for them:",
     "- title (role slide-title/title): the slide headline. Words: заголовок, название, title, headline. Edit: set_text.",
@@ -74,6 +80,7 @@ export async function runChat(
     "- bar (role bar): ONE column of a bar-chart, a CONTAINER decomposed into three atomic children, each individually addressable by id: bar-value (the number on top, content.text), bar-fill (the rectangle — content.barValue height 0..100, style.color the fill), bar-label (the category underneath, content.text). \"the third bar / третий столбец\" = the 3rd `bar` child of the chart, in order; its atoms are that bar's children. To recolour a column: set_token {prop:color} on its bar-fill. To change its height: set_content {barValue} on the bar-fill. To change the number/label: set_content {text} on its bar-value / bar-label. Touch only the atoms you're asked to.",
     "",
     "Rules: style/colors only via set_token / format_range with theme tokens (never raw hex/px). Only edit nodes that exist.",
+    "Honesty: if you genuinely cannot do what was asked (it needs a capability you don't have, or the targeted node has no relevant field for it), say so plainly in `reply` and return an EMPTY ops array. NEVER fake it by editing a different node or stuffing the request into a text/label field. Respect the user's selected node.",
     'To recolour/restyle ONE word, letter, or phrase INSIDE a text (e.g. "make the word build orange"), use format_range with target {match:"build"} — the server finds the character offsets itself; never compute offsets by hand. Use set_token only when the user means the WHOLE text node.',
     "Available theme tokens: " + tokens(deck),
     "All components:\n" + outline(deck),
