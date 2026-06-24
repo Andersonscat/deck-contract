@@ -138,19 +138,40 @@ export function createViewerServer(opts: ViewerOptions) {
         const buf = await generateImage(prompt, openaiKey);
         const src = await saveAsset(buf);
         const newId = "img_" + Date.now().toString(36) + "_" + Math.floor(Math.random() * 1e7).toString(36);
-        const target = op.target ? idx.get(op.target) : undefined;
+        // For a replace, TRUST the user's actual selection over the AI's guessed target (haiku
+        // sometimes returns the slide id). Never replace a whole slide.
+        let repId = op.mode === "replace" ? selId ?? op.target : undefined;
+        let repEntry = repId ? idx.get(repId) : undefined;
+        if (repEntry && (repEntry.node.type === "slide" || repId === currentSlideId)) {
+          repEntry = undefined;
+          repId = undefined;
+        }
         // Prefer the on-screen box of the thing being replaced, so the image lands where it was.
-        const replacedBox = op.target && op.target === selId ? selBox : undefined;
-        const frame = (op.frame as object) ?? replacedBox ?? target?.node.frame ?? { x: 34, y: 28, w: 32, h: 40 };
+        const replacedBox = repId && repId === selId ? selBox : undefined;
+        const rawFrame = (op.frame as object) ?? replacedBox ?? repEntry?.node.frame ?? { x: 34, y: 28, w: 32, h: 40 };
+        // A thin element (e.g. a bar) would crush a contained image to a sliver; grow the box to a
+        // visible minimum, centered on where the element was, clamped to the slide.
+        const ensureVisible = (f: { x?: number; y?: number; w?: number; h?: number }) => {
+          const minW = 20, minH = 26;
+          let x = f.x ?? 30, y = f.y ?? 26, w = f.w ?? minW, h = f.h ?? minH;
+          if (w < minW) { x += w / 2 - minW / 2; w = minW; }
+          if (h < minH) { y += h / 2 - minH / 2; h = minH; }
+          x = Math.max(0, Math.min(x, 100 - w));
+          y = Math.max(0, Math.min(y, 100 - h));
+          const r = (n: number) => Math.round(n * 1000) / 1000;
+          return { x: r(x), y: r(y), w: r(w), h: r(h) };
+        };
+        const frame = ensureVisible(rawFrame as { x?: number; y?: number; w?: number; h?: number });
         const alt = prompt.slice(0, 80);
         // role "sticker" => the compiler shows the whole transparent cutout (object-fit:contain).
         const imgNode: DeckNode = { id: newId, type: "image-caption", role: "sticker", content: { src, alt }, frame } as DeckNode;
-        if (op.mode === "replace" && target) {
-          if (target.node.type === "image-caption") {
-            out.push({ op: "set_content", nodeId: op.target, content: { src, alt } });
+        if (repEntry && repId) {
+          if (repEntry.node.type === "image-caption") {
+            out.push({ op: "set_content", nodeId: repId, content: { src, alt } });
           } else {
-            out.push({ op: "remove_node", nodeId: op.target });
-            out.push({ op: "insert_node", parentId: target.slideId, index: 999, node: imgNode });
+            // swap the element for the image, placed where it lived (on its slide as a free node)
+            out.push({ op: "remove_node", nodeId: repId });
+            out.push({ op: "insert_node", parentId: repEntry.slideId, index: 999, node: imgNode });
           }
         } else {
           const parentId = op.parentId ?? currentSlideId ?? deck.slides[0]?.id;
