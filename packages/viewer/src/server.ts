@@ -217,6 +217,35 @@ export function createViewerServer(opts: ViewerOptions) {
           return json({ error: e instanceof Error ? e.message : String(e) });
         }
       }
+      if (req.method === "POST" && url === "/api/set_size") {
+        const { nodeId, prop, px, range } = JSON.parse(await body(req));
+        try {
+          const n = Math.max(4, Math.min(400, Math.round(Number(px))));
+          if (!n) return json({ error: "set_size: bad px" });
+          // Mint a theme token for this exact size on the fly, so the node still references a
+          // token (token-only invariant holds) rather than a raw px value.
+          const key = String(n);
+          const deck = await readDeck();
+          if (deck.theme.type[key] !== `${n}px`) {
+            deck.theme.type[key] = `${n}px`;
+            await writeDeck(deck);
+          }
+          const value = `token://type/${key}`;
+          const op =
+            range && prop === "size"
+              ? { op: "format_range", nodeId, target: range, prop: "size", value }
+              : { op: "set_token", nodeId, prop: prop ?? "size", value };
+          await commit([op]);
+          const next = await readDeck();
+          const { css, slides } = compileSlides(next);
+          const type = Object.fromEntries(
+            Object.entries(next.theme.type).map(([k, v]) => [k, parseInt(v as string, 10) || v]),
+          );
+          return json({ ok: true, ...hist(), slides, css, type });
+        } catch (e) {
+          return json({ error: e instanceof Error ? e.message : String(e) });
+        }
+      }
       if (req.method === "POST" && url === "/api/add_slide") {
         try {
           const deck = await readDeck();

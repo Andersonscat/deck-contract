@@ -80,6 +80,8 @@ export const CHROME_CSS = `
 .dc-grp{ display:flex; align-items:center; gap:7px; }
 .dc-dd{ position:relative; }
 .dc-dd-trg{ height:34px; min-width:60px; display:flex; align-items:center; justify-content:space-between; gap:9px; border:1px solid #e6e8ee; background:#fff; border-radius:10px; padding:0 11px; cursor:pointer; font-size:13px; color:#1f2330; transition:background .12s,border-color .12s; }
+.dc-num{ width:62px; height:34px; border:1px solid #e6e8ee; background:#fff; border-radius:10px; padding:0 9px; font-size:13px; color:#1f2330; }
+.dc-num:focus{ outline:none; border-color:#c7cbd3; }
 .dc-dd-trg:hover{ background:#f6f7f9; border-color:#dcdfe6; }
 .dc-cv{ width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid #aab0bb; }
 .dc-dd-menu{ position:absolute; top:calc(100% + 6px); left:0; min-width:128px; max-height:266px; overflow:auto; display:none; flex-direction:column; gap:1px; background:#fff; border:1px solid #e6e8ee; border-radius:12px; padding:6px; z-index:100; }
@@ -174,7 +176,7 @@ export const CLIENT_JS = `
   }
   function tokenKey(ref){ if(!ref) return ''; var m=/token:\\/\\/[a-z]+\\/([A-Za-z0-9-]+)/.exec(ref); return m?m[1]:''; }
   function cap(s){ return (''+s).charAt(0).toUpperCase()+(''+s).slice(1); }
-  var FONT_LABELS={ dmsans:'DM Sans', spacegrotesk:'Space Grotesk', playfair:'Playfair Display', merriweather:'Merriweather', heading:'Heading', body:'Body' };
+  var FONT_LABELS={ dmsans:'DM Sans', spacegrotesk:'Space Grotesk', playfair:'Playfair Display', merriweather:'Merriweather', heading:'Inter', body:'Inter' };
   function fontLabel(k){ return FONT_LABELS[k]||cap(k); }
   // Apply edits optimistically to the live DOM so style/position changes are instant and the
   // slide doesn't have to be rebuilt (which flashes + drops the selection). Returns true only
@@ -231,6 +233,26 @@ export const CLIENT_JS = `
       if(r&&r.cid===cid){ lastTextSel=null; op([{op:'format_range',nodeId:cid,target:{from:r.from,to:r.to},prop:prop,value:value}]); return; } }
     op([{op:'set_token',nodeId:cid,prop:prop,value:value}]);
   }
+  // Free-typed font size: the server mints a theme token for that px on the fly (so style stays
+  // token-only) and applies it to the node (or to the selected text range).
+  function sizeInput(cid,prop,curPx){
+    var inp=document.createElement('input'); inp.type='number'; inp.className='dc-num'; inp.value=curPx||''; inp.min='4'; inp.max='400'; inp.step='1';
+    function go(){ var v=parseInt(inp.value,10); if(!v||v<4||v>400){ inp.value=curPx||''; return; } applySize(cid,prop,v); }
+    inp.addEventListener('keydown',function(k){ if(k.key==='Enter'){ k.preventDefault(); inp.blur(); } });
+    inp.addEventListener('change',go);
+    return inp;
+  }
+  function applySize(cid,prop,px){
+    var r=(prop==='size')?(computeTextRange()||lastTextSel):null;
+    var range=(r&&r.cid===cid)?{from:r.from,to:r.to}:null; if(range) lastTextSel=null;
+    opInFlight++; opSeq++;
+    post('/api/set_size',{nodeId:cid,prop:prop,px:px,range:range}).then(function(res){ opInFlight--;
+      if(res&&res.error){ flash('error: '+res.error); return; }
+      if(res.css){ var th=document.getElementById('dc-theme'); if(th) th.textContent=res.css; }
+      if(res.type&&window.DC_THEME) window.DC_THEME.type=res.type;
+      setHist(res); if(res.slides) applySlides(res.slides,true);
+    },function(){ opInFlight--; });
+  }
   // Copy / paste / duplicate an element. The copied node's subtree is held in a JS clipboard;
   // paste clones it server-side with fresh ids and drops it on the current slide, offset (and
   // cascaded on repeat) so it's visible. Cmd/Ctrl + C / V / D.
@@ -260,7 +282,7 @@ export const CLIENT_JS = `
     var wrap=document.createElement('div'); wrap.className='dc-dd';
     var trg=document.createElement('button'); trg.type='button'; trg.className='dc-dd-trg';
     function find(v){ for(var i=0;i<o.items.length;i++) if(o.items[i].v===v) return o.items[i]; return null; }
-    function renderTrg(){ trg.innerHTML=''; var it=find(o.value); if(it&&it.swatch){ var s=document.createElement('span'); s.className='dc-sw'; s.style.background=it.swatch; trg.appendChild(s); } var t=document.createElement('span'); t.textContent=it?it.label:'—'; trg.appendChild(t); var cv=document.createElement('span'); cv.className='dc-cv'; trg.appendChild(cv); }
+    function renderTrg(){ trg.innerHTML=''; var it=find(o.value); if(it&&it.swatch){ var s=document.createElement('span'); s.className='dc-sw'; s.style.background=it.swatch; trg.appendChild(s); } var t=document.createElement('span'); t.textContent=it?it.label:(o.labelFor?o.labelFor(o.value):'—'); trg.appendChild(t); var cv=document.createElement('span'); cv.className='dc-cv'; trg.appendChild(cv); }
     renderTrg();
     var menu=document.createElement('div'); menu.className='dc-dd-menu';
     o.items.forEach(function(it){ var b=document.createElement('button'); b.type='button'; b.className='dc-dd-item'+(it.v===o.value?' sel':''); if(it.swatch){ var s=document.createElement('span'); s.className='dc-sw'; s.style.background=it.swatch; b.appendChild(s); } var t=document.createElement('span'); t.textContent=it.label; if(it.face) t.style.fontFamily=it.face; b.appendChild(t); b.onclick=function(ev){ ev.stopPropagation(); o.value=it.v; renderTrg(); menu.classList.remove('on'); o.onSelect(it.v); }; menu.appendChild(b); });
@@ -286,8 +308,8 @@ export const CLIENT_JS = `
   function buildTool(cid,type,node){
     tool.className=''; tool.innerHTML='';
     var sp=styleProps(type); var th=window.DC_THEME||{}; var st=(node&&node.style)||{}; var cf=contentField(type);
-    if(sp.font){ tool.appendChild(group('Font', makeDropdown({ value:tokenKey(st[sp.font]), items:(th.font||[]).map(function(k){ return {v:k,label:fontLabel(k),face:'var(--font-'+k+')'}; }), onSelect:function(v){ applyToken(cid,sp.font,'token://font/'+v); } }))); }
-    if(sp.size){ var sizes=th.type||{}; var keys=Object.keys(sizes).sort(function(a,b){ return sizes[b]-sizes[a]; }); tool.appendChild(group('Size', makeDropdown({ value:tokenKey(st[sp.size]), items:keys.map(function(k){ return {v:k,label:''+sizes[k]}; }), onSelect:function(v){ applyToken(cid,sp.size,'token://type/'+v); } }))); }
+    if(sp.font){ var ffs=(th.font||[]).filter(function(k){ return k!=='heading'&&k!=='body'; }); tool.appendChild(group('Font', makeDropdown({ value:tokenKey(st[sp.font]), labelFor:fontLabel, items:ffs.map(function(k){ return {v:k,label:fontLabel(k),face:'var(--font-'+k+')'}; }), onSelect:function(v){ applyToken(cid,sp.font,'token://font/'+v); } }))); }
+    if(sp.size){ var curPx=(th.type||{})[tokenKey(st[sp.size])]||''; tool.appendChild(group('Size', sizeInput(cid,sp.size,curPx))); }
     if(sp.color){ var cols=th.color||{}; var ck=Object.keys(cols); tool.appendChild(group('Color', makeDropdown({ value:tokenKey(st[sp.color]), items:ck.map(function(k){ return {v:k,label:cap(k),swatch:cols[k]}; }), onSelect:function(v){ applyToken(cid,sp.color,'token://color/'+v); } }))); }
     if(cf==='text'||cf==='items'){ tool.appendChild(alignSeg(cid,(node&&node.textAlign)||'left')); }
     tool.appendChild(insertBtn('Text','heading'));

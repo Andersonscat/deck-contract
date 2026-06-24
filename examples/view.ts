@@ -7,7 +7,7 @@
  * or "Set as AI target" and ask Claude (via the MCP server, sharing this same file +
  * selection) to change exactly what you pointed at. Edits reload live.
  */
-import { mkdirSync, copyFileSync } from "node:fs";
+import { mkdirSync, copyFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
@@ -19,7 +19,12 @@ const outDir = join(here, "out");
 mkdirSync(outDir, { recursive: true });
 
 const deckPath = join(outDir, "working.deck.json");
-copyFileSync(join(repoRoot, "registry", "minimal-dark", "deck.json"), deckPath);
+// PERSIST the working deck across restarts so your edits survive (and two terminals/agents
+// share one deck file). Seed it from the template only when it doesn't exist yet, or when
+// DECK_FRESH=1 is set to deliberately start over from the template.
+if (process.env.DECK_FRESH === "1" || !existsSync(deckPath)) {
+  copyFileSync(join(repoRoot, "registry", "minimal-dark", "deck.json"), deckPath);
+}
 
 const selectionDir = join(homedir(), ".deck-contract");
 mkdirSync(selectionDir, { recursive: true });
