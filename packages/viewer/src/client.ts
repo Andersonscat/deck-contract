@@ -197,7 +197,7 @@ export const CLIENT_JS = `
   function tokenToVarJS(ref){ var m=/^token:\\/\\/([a-z][a-z0-9]*)\\/([A-Za-z0-9][A-Za-z0-9-]*)$/.exec(ref); return m?'var(--'+m[1]+'-'+m[2]+')':ref; }
   function applyOptimistic(ops){
     for(var i=0;i<ops.length;i++){ var o=ops[i]; var el=document.querySelector('#dc-stage [data-cid="'+o.nodeId+'"]'); if(!el) return false;
-      if(o.op==='set_token'){ var cp=CSS_PROP[o.prop]||('--'+o.prop); if(o.prop==='color'&&el.getAttribute('data-type')==='bar') cp='background'; el.style.setProperty(cp, tokenToVarJS(o.value)); }
+      if(o.op==='set_token'){ var cp=CSS_PROP[o.prop]||('--'+o.prop); if(o.prop==='color'&&el.getAttribute('data-type')==='bar') cp='--bar-fill'; el.style.setProperty(cp, tokenToVarJS(o.value)); }
       else if(o.op==='set_align'){ el.style.textAlign=o.value; }
       else if(o.op==='set_frame'){ var f=o.frame; el.style.position='absolute'; el.style.left=f.x+'%'; el.style.top=f.y+'%'; if(f.w!=null) el.style.width=f.w+'%'; if(f.h!=null) el.style.height=f.h+'%'; }
       else if(o.op==='move_to'){ el.style.left=o.x+'%'; el.style.top=o.y+'%'; }

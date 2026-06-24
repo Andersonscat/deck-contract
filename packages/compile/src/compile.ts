@@ -197,26 +197,32 @@ function renderLeaf(node: DeckNode): string {
 }
 
 /**
- * A single bar = one addressable component of a decomposed bar-chart. Height comes from
- * content.barValue (0..100% of the chart box); the fill is the node's own `color` token
- * (rendered as background) so the standard recolor/AI path targets ONE bar by its id.
+ * A single bar = one addressable component (column) of a decomposed bar-chart: a plot area
+ * whose rectangle is content.barValue (0..100%) tall, an optional value on top, and an
+ * optional category label below. Each piece is editable on this ONE node by id —
+ * set_content { barValue, value, label } and set_token { color } (the fill, via --bar-fill).
  */
 function renderBar(node: DeckNode): string {
   const c = node.content ?? {};
   const v = Math.max(0, Math.min(100, Number(c.barValue ?? 0)));
   const fill = node.style?.color ?? node.style?.background;
-  const parts: string[] = [];
-  if (node.frame) parts.push(frameToCss(node.frame));
-  parts.push(
-    "flex:1 1 0%",
-    "min-width:0",
-    "align-self:flex-end",
-    `height:${fmt(v)}%`,
-    "border-radius:7px 7px 0 0",
-    `background:${fill ? tokenToVar(fill) : "var(--color-accent)"}`,
-  );
+  const fillCss = fill ? tokenToVar(fill) : "var(--color-accent)";
+  const labelColor = node.style?.labelColor ? tokenToVar(node.style.labelColor) : "var(--color-muted)";
+  const valueColor = node.style?.valueColor ? tokenToVar(node.style.valueColor) : fillCss;
+  const label = c.label ? esc(c.label) : "";
+  const value = c.value != null && c.value !== "" ? esc(String(c.value)) : "";
+  const col = ["flex:1 1 0%", "min-width:0", "display:flex", "flex-direction:column", "align-items:center", "height:100%", "gap:6px", `--bar-fill:${fillCss}`];
+  if (node.frame) col.unshift(frameToCss(node.frame));
   const roleAttr = node.role ? ` data-role="${esc(node.role)}"` : "";
-  return `<div data-cid="${esc(node.id)}" data-type="bar"${roleAttr} style="${esc(parts.join(";"))}"></div>`;
+  return (
+    `<div data-cid="${esc(node.id)}" data-type="bar"${roleAttr} style="${esc(col.join(";"))}">` +
+    `<div style="flex:1;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;min-height:0">` +
+    (value ? `<div style="font-size:13px;font-weight:700;line-height:1;color:${valueColor}">${value}</div>` : "") +
+    `<div style="width:64%;max-width:54px;height:${fmt(v)}%;min-height:2px;background:var(--bar-fill);border-radius:6px 6px 0 0"></div>` +
+    `</div>` +
+    (label ? `<div style="font-size:13px;line-height:1;color:${labelColor}">${label}</div>` : "") +
+    `</div>`
+  );
 }
 
 function renderNode(node: DeckNode): string {

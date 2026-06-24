@@ -100,7 +100,9 @@ describe("compileHtml", () => {
     expect(html).toContain('data-type="bar"');
     expect(html).toContain("height:40%");
     expect(html).toContain("height:90%");
-    expect(html).toContain("background:var(--color-accent)");
-    expect(html).toContain("background:var(--color-muted)");
+    // each bar's fill is exposed as --bar-fill (the rect uses background:var(--bar-fill))
+    expect(html).toContain("--bar-fill:var(--color-accent)");
+    expect(html).toContain("--bar-fill:var(--color-muted)");
+    expect(html).toContain("background:var(--bar-fill)");
   });
 });

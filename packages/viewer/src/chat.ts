@@ -47,7 +47,7 @@ export async function runChat(
   selection: { nodeId: string } | null,
   apiKey: string,
   currentSlideId?: string,
-  model = "claude-sonnet-4-6",
+  model = "claude-haiku-4-5",
 ): Promise<ChatResult> {
   const selectedNode = selection ? buildIndex(deck).get(selection.nodeId)?.node : undefined;
 
@@ -71,7 +71,7 @@ export async function runChat(
     "- stat-callout (role key-metric): a big metric. Words: метрика, число, показатель, KPI. Edit: set_content { value, label, delta }.",
     "- image-caption (role visual): image + caption. Words: картинка, изображение, image. Edit: set_content { src, alt, caption }.",
     "- bar-chart (role chart): a CONTAINER whose children are individual `bar` components (one per column), in order. Words: график, диаграмма, chart, bar chart.",
-    "- bar (role bar): ONE column of a bar-chart, individually addressable by its id. content.barValue is its height 0..100; style.color is its fill. \"the third bar / третий столбец\" = the 3rd `bar` child of that chart, in order. Edit ONE bar: set_token {prop:color} to recolour it, set_content {barValue:N} to change its height/size. Never edit the others unless asked.",
+    "- bar (role bar): ONE column of a bar-chart, individually addressable by its id. It owns content.barValue (height 0..100), content.value (the number shown on top), content.label (the category under it), and style.color (its fill). \"the third bar / третий столбец\" = the 3rd `bar` child of that chart, in order. Edit ONE bar: set_token {prop:color} to recolour it; set_content { barValue, value, label } to change its height / number / caption. Keep the other bars untouched unless asked.",
     "",
     "Rules: style/colors only via set_token / format_range with theme tokens (never raw hex/px). Only edit nodes that exist.",
     'To recolour/restyle ONE word, letter, or phrase INSIDE a text (e.g. "make the word build orange"), use format_range with target {match:"build"} — the server finds the character offsets itself; never compute offsets by hand. Use set_token only when the user means the WHOLE text node.',
