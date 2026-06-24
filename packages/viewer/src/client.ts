@@ -59,6 +59,7 @@ export const CHROME_CSS = `
 #dc-center{ flex:1; min-width:0; display:flex; flex-direction:column; background:#dfe2e7; position:relative; }
 #dc-stage{ flex:1; position:relative; overflow-y:auto; overflow-x:hidden; display:flex; flex-direction:column; align-items:center; gap:24px; padding:30px 0 60px; min-height:0; }
 .dc-frame{ display:block; flex:none; border:1px solid #aeb3bd; background:#000; }
+.dc-frame-sel{ outline:3px solid #ec5a13; outline-offset:3px; border-radius:4px; }
 .dc-frame > section{ transform-origin:top left; }
 #dc-stage [data-cid]{ cursor:grab; }
 #dc-stage section[data-cid]{ cursor:default; }
@@ -109,6 +110,8 @@ export const CHROME_CSS = `
 .dc-seg button:hover{ background:#f6f7f9; }
 .dc-seg button.on{ background:#ec5a13; color:#fff; }
 .dc-ai,.dc-add{ height:34px; border:1px solid #e6e8ee; background:#fff; color:#2a2f3a; border-radius:10px; padding:0 15px; cursor:pointer; font-size:13px; transition:background .12s; }
+.dc-add.dc-danger{ color:#dc2626; border-color:#f3c2c2; }
+.dc-add.dc-danger:hover{ background:#fef2f2; }
 .dc-ai:hover,.dc-add:hover{ background:#f3f4f6; }
 .dc-ai{ font-weight:600; }
 #dc-flash{ position:absolute; bottom:14px; left:14px; background:#111; color:#fff; padding:7px 12px; border-radius:6px; font-size:12px; opacity:0; transition:opacity .2s; z-index:30; }
@@ -166,7 +169,7 @@ export const CLIENT_JS = `
   var TOOL_EMPTY='Select an element to edit it';
   function setHead(t){ var h=document.getElementById('dc-chat-head'); if(h) h.textContent=t; }
   function deleteNode(cid){ post('/api/op',{ops:[{op:'remove_node',nodeId:cid}]}).then(function(res){ if(res&&res.error) flash('error: '+res.error); else flash('deleted'); }); }
-  function clearSel(){ var n=document.querySelectorAll('.dc-selected'); for(var i=0;i<n.length;i++) n[i].classList.remove('dc-selected'); sel=null; setHead('AI assistant'); buildDefaultTool(); hideHandles(); restoreElements(); if(layersOn()) buildLayers(); }
+  function clearSel(){ var n=document.querySelectorAll('.dc-selected'); for(var i=0;i<n.length;i++) n[i].classList.remove('dc-selected'); var fs=document.querySelectorAll('.dc-frame-sel'); for(var k=0;k<fs.length;k++) fs[k].classList.remove('dc-frame-sel'); sel=null; setHead('AI assistant'); buildDefaultTool(); hideHandles(); restoreElements(); if(layersOn()) buildLayers(); }
   // when nothing is selected the top bar still shows useful content (insert actions)
   function buildDefaultTool(){
     if(!tool) return;
@@ -322,7 +325,8 @@ export const CLIENT_JS = `
     var noTab=opts&&opts.noTab;
     clearSel(); el.classList.add('dc-selected'); sel=el;
     var cid=el.getAttribute('data-cid'); var type=el.getAttribute('data-type');
-    setHead('AI · selected: '+type);
+    if(el.tagName==='SECTION'){ var fr=el.closest('.dc-frame'); if(fr) fr.classList.add('dc-frame-sel'); } // slide selected -> highlight the whole frame
+    setHead(el.tagName==='SECTION'?'AI · selected: slide':'AI · selected: '+type);
     if(VARIANTS[type]&&!noTab){ setTab('elements'); showVariants(type,null); }
     positionHandles();
     fetch('/api/node?id='+encodeURIComponent(cid)).then(function(r){ return r.json(); }).then(function(node){ if(sel!==el) return; var n=(node&&node.id)?node:null; buildTool(cid,type,n); if(VARIANTS[type]&&!noTab) showVariants(type,n); }).catch(function(){ if(sel===el) buildTool(cid,type,null); });
@@ -371,12 +375,30 @@ export const CLIENT_JS = `
   }
   function buildTool(cid,type,node){
     tool.className=''; tool.innerHTML='';
+    if(type==='slide'){ buildSlideTool(cid,node); return; }
     var sp=styleProps(type); var th=window.DC_THEME||{}; var st=(node&&node.style)||{}; var cf=contentField(type);
     if(sp.font){ var ffs=(th.font||[]).filter(function(k){ return k!=='heading'&&k!=='body'; }); tool.appendChild(group('Font', makeDropdown({ value:tokenKey(st[sp.font]), labelFor:fontLabel, items:ffs.map(function(k){ return {v:k,label:fontLabel(k),face:'var(--font-'+k+')'}; }), onSelect:function(v){ applyToken(cid,sp.font,'token://font/'+v); } }))); }
     if(sp.size){ var curPx=(th.type||{})[tokenKey(st[sp.size])]||''; tool.appendChild(group('Size', sizeInput(cid,sp.size,curPx))); }
     if(sp.color){ var cols=th.color||{}; var ck=Object.keys(cols); tool.appendChild(group('Color', makeDropdown({ value:tokenKey(st[sp.color]), items:ck.map(function(k){ return {v:k,label:cap(k),swatch:cols[k]}; }), onSelect:function(v){ applyToken(cid,sp.color,'token://color/'+v); } }))); }
     if(cf==='text'||cf==='items'){ tool.appendChild(alignSeg(cid,(node&&node.textAlign)||'left')); }
     tool.appendChild(insertBtn('Text','heading'));
+  }
+  // Page-level controls shown when the whole slide is selected.
+  function buildSlideTool(cid,node){
+    var th=window.DC_THEME||{}; var st=(node&&node.style)||{}; var cols=th.color||{}; var ck=Object.keys(cols);
+    tool.appendChild(group('Background', makeDropdown({ value:tokenKey(st.background), items:ck.map(function(k){ return {v:k,label:cap(k),swatch:cols[k]}; }), onSelect:function(v){ op([{op:'set_token',nodeId:cid,prop:'background',value:'token://color/'+v}]); } })));
+    var dup=document.createElement('button'); dup.type='button'; dup.className='dc-add'; dup.textContent='Duplicate'; dup.onclick=function(ev){ ev.stopPropagation(); duplicateSlide(cid); };
+    var del=document.createElement('button'); del.type='button'; del.className='dc-add dc-danger'; del.textContent='Delete'; del.onclick=function(ev){ ev.stopPropagation(); deleteSlide(cid); };
+    tool.appendChild(dup); tool.appendChild(del);
+  }
+  function duplicateSlide(slideId){
+    fetch('/api/node?id='+encodeURIComponent(slideId)).then(function(r){ return r.json(); }).then(function(n){ if(!n||!n.id) return;
+      post('/api/paste',{node:n,parentId:'@slides',index:cur+1}).then(function(res){ if(res&&res.error){ flash('error: '+res.error); return; } sessionStorage.setItem('dc-cur',String(cur+1)); location.reload(); });
+    }).catch(function(){});
+  }
+  function deleteSlide(slideId){
+    if(frames.length<=1){ flash('cannot delete the last slide'); return; }
+    post('/api/op',{ops:[{op:'remove_node',nodeId:slideId}]}).then(function(res){ if(res&&res.error){ flash('error: '+res.error); return; } sessionStorage.setItem('dc-cur',String(Math.max(0,cur-1))); location.reload(); });
   }
 
   window.addEventListener('resize',function(){ fitAll(); updateCurrent(); positionHandles(); });
@@ -512,8 +534,9 @@ export const CLIENT_JS = `
     if(dragged){ dragged=false; return; }
     if(e.target.closest('#dc-topbar')||e.target.closest('#dc-left')||e.target.closest('#dc-right')) return;
     var el=e.target.closest('#dc-stage [data-cid]');
-    if(!el||el.tagName==='SECTION'){ clearSel(); return; } // clicking the slide background deselects
-    e.preventDefault(); select(selectTarget(el));
+    if(!el){ clearSel(); return; } // clicked the empty stage gutter -> deselect everything
+    e.preventDefault();
+    if(el.tagName==='SECTION') select(el); else select(selectTarget(el)); // SECTION = the slide itself
   });
   // hover frame + free drag (move by coordinates -> set_frame / move_to)
   var dragHover=null, candEl=null, downPt=null, dragging=false, dragNode=null, dragged=false;
