@@ -144,12 +144,14 @@ export function createViewerServer(opts: ViewerOptions) {
       '<style id="dc-theme">' + css + "</style><style>" + CHROME_CSS + "</style></head><body class=\"dc-app\">" +
       '<div id="dc-left"><div class="dc-rail">' +
       '<button class="dc-tab dc-act" data-tab="slides"><span class="dc-ico">▤</span>Slides</button>' +
+      '<button class="dc-tab" data-tab="layers"><span class="dc-ico">⧉</span>Layers</button>' +
       '<button class="dc-tab" data-tab="elements"><span class="dc-ico">◆</span>Elements</button>' +
       '<button class="dc-tab" data-tab="text"><span class="dc-ico">T</span>Text</button>' +
       '<button class="dc-tab" data-tab="brand"><span class="dc-ico">✦</span>Brand</button>' +
       '</div><div class="dc-panels">' +
       '<div class="dc-panel2 dc-on" data-panel="slides"><h4>Slides</h4><div id="dc-thumbs">' + thumbs +
       '</div><button id="dc-add-slide"><span>+</span> New slide</button></div>' +
+      '<div class="dc-panel2" data-panel="layers"><h4>Layers</h4><div id="dc-layers"></div></div>' +
       '<div class="dc-panel2" data-panel="elements"><h4>Elements</h4>' + elGrid(ELEMENT_BLOCKS) + "</div>" +
       '<div class="dc-panel2" data-panel="text"><h4>Text</h4>' + elGrid(TEXT_BLOCKS) + "</div>" +
       '<div class="dc-panel2" data-panel="brand"><h4>Theme colors</h4><div class="dc-swatches">' + swatches + "</div></div>" +

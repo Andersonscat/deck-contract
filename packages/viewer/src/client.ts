@@ -20,6 +20,15 @@ export const CHROME_CSS = `
 .dc-panel2{ display:none; padding:16px; }
 .dc-panel2.dc-on{ display:block; }
 .dc-panel2 h4{ margin:0 0 12px; font-size:12px; color:#9298a3; font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+#dc-layers{ display:flex; flex-direction:column; }
+.dc-layer{ display:flex; align-items:center; gap:6px; height:28px; padding-right:8px; border-radius:6px; cursor:pointer; color:#3a3f4a; font-size:13px; white-space:nowrap; overflow:hidden; }
+.dc-layer:hover{ background:#f3f4f6; }
+.dc-layer.sel{ background:#ec5a13; color:#fff; }
+.dc-lyr-tg{ width:14px; flex:none; color:#9298a3; font-size:9px; text-align:center; }
+.dc-layer.sel .dc-lyr-tg{ color:#fff; }
+.dc-lyr-ic{ width:15px; height:15px; flex:none; display:flex; align-items:center; justify-content:center; color:#6b7280; }
+.dc-layer.sel .dc-lyr-ic{ color:#fff; }
+.dc-lyr-nm{ overflow:hidden; text-overflow:ellipsis; }
 .dc-thumbrow{ display:flex; align-items:center; gap:8px; margin:0 0 12px; }
 .dc-thumbrow .dc-no{ width:14px; flex:none; text-align:right; color:#9298a3; font:600 12px/1 -apple-system,Segoe UI,sans-serif; }
 .dc-thumbrow.dc-cur .dc-no{ color:#ec5a13; }
@@ -143,10 +152,11 @@ export const CLIENT_JS = `
   function updateCurrent(){
     var mid=stage.scrollTop+stage.clientHeight/2, best=0, bestD=1e9;
     for(var i=0;i<frames.length;i++){ var c=frames[i].offsetTop+frames[i].offsetHeight/2, d=Math.abs(c-mid); if(d<bestD){ bestD=d; best=i; } }
-    cur=best; sessionStorage.setItem('dc-cur',String(cur));
+    var changed=(cur!==best); cur=best; sessionStorage.setItem('dc-cur',String(cur));
     for(var t=0;t<thumbs.length;t++){ var row=thumbs[t].closest('.dc-thumbrow'); if(row) row.classList.toggle('dc-cur',t===cur); }
     // floating "current slide" indicator over the scrollable stage (what the AI gets as the current slide)
     var pn=pageNo(); pn.innerHTML='Slide <b>'+(cur+1)+'</b> / '+frames.length; var r=stage.getBoundingClientRect(); pn.style.left=(r.left+r.width/2)+'px';
+    if(changed&&layersOn()) buildLayers();
   }
   function goTo(i){ var f=frames[i]; if(f) f.scrollIntoView({behavior:'smooth',block:'center'}); }
   function flash(m){ var h=document.getElementById('dc-flash'); h.textContent=m; h.style.opacity='1'; setTimeout(function(){ h.style.opacity='0'; },1600); }
@@ -156,7 +166,7 @@ export const CLIENT_JS = `
   var TOOL_EMPTY='Select an element to edit it';
   function setHead(t){ var h=document.getElementById('dc-chat-head'); if(h) h.textContent=t; }
   function deleteNode(cid){ post('/api/op',{ops:[{op:'remove_node',nodeId:cid}]}).then(function(res){ if(res&&res.error) flash('error: '+res.error); else flash('deleted'); }); }
-  function clearSel(){ var n=document.querySelectorAll('.dc-selected'); for(var i=0;i<n.length;i++) n[i].classList.remove('dc-selected'); sel=null; setHead('AI assistant'); buildDefaultTool(); hideHandles(); restoreElements(); }
+  function clearSel(){ var n=document.querySelectorAll('.dc-selected'); for(var i=0;i<n.length;i++) n[i].classList.remove('dc-selected'); sel=null; setHead('AI assistant'); buildDefaultTool(); hideHandles(); restoreElements(); if(layersOn()) buildLayers(); }
   // when nothing is selected the top bar still shows useful content (insert actions)
   function buildDefaultTool(){
     if(!tool) return;
@@ -308,13 +318,56 @@ export const CLIENT_JS = `
   function alignSeg(cid,cur){ var seg=document.createElement('div'); seg.className='dc-seg'; ['left','center','right'].forEach(function(a){ var b=document.createElement('button'); b.type='button'; b.title=a; b.innerHTML=ALIGN_ICONS[a]; if(a===cur) b.className='on'; b.onclick=function(ev){ ev.stopPropagation(); op([{op:'set_align',nodeId:cid,value:a}]); }; seg.appendChild(b); }); return seg; }
   function insertBtn(label,blockId){ var b=document.createElement('button'); b.type='button'; b.className='dc-add'; b.textContent=label; b.onclick=function(ev){ ev.stopPropagation(); var pid=curSlideId(); if(!pid) return; post('/api/insert_block',{blockId:blockId,parentId:pid,index:999}).then(function(res){ if(res&&res.error) flash('error: '+res.error); else flash('added '+label); }); }; return b; }
 
-  function select(el){
+  function select(el,opts){
+    var noTab=opts&&opts.noTab;
     clearSel(); el.classList.add('dc-selected'); sel=el;
     var cid=el.getAttribute('data-cid'); var type=el.getAttribute('data-type');
     setHead('AI · selected: '+type);
-    if(VARIANTS[type]){ setTab('elements'); showVariants(type,null); }
+    if(VARIANTS[type]&&!noTab){ setTab('elements'); showVariants(type,null); }
     positionHandles();
-    fetch('/api/node?id='+encodeURIComponent(cid)).then(function(r){ return r.json(); }).then(function(node){ if(sel!==el) return; var n=(node&&node.id)?node:null; buildTool(cid,type,n); if(VARIANTS[type]) showVariants(type,n); }).catch(function(){ if(sel===el) buildTool(cid,type,null); });
+    fetch('/api/node?id='+encodeURIComponent(cid)).then(function(r){ return r.json(); }).then(function(node){ if(sel!==el) return; var n=(node&&node.id)?node:null; buildTool(cid,type,n); if(VARIANTS[type]&&!noTab) showVariants(type,n); }).catch(function(){ if(sel===el) buildTool(cid,type,null); });
+    if(layersOn()) buildLayers();
+  }
+  // Layers panel: the current slide's component tree (Framer-style). Click selects on the
+  // canvas, hover highlights, the chevron expands/collapses nested containers. Built from the
+  // rendered DOM: every [data-cid] is a real node; wrapper divs are transparent.
+  function layersOn(){ var p=document.querySelector('.dc-panel2[data-panel="layers"]'); return !!(p&&p.classList.contains('dc-on')); }
+  var LCOLLAPSED={};
+  var LTYPE={ title:'Title', heading:'Heading', text:'Text', 'bullet-list':'List', 'stat-callout':'Metric', 'image-caption':'Image', 'bar-chart':'Bar chart', bar:'Bar', table:'Table', 'two-column':'Columns', quote:'Quote' };
+  function cidKids(el){ var out=[]; (function d(n){ for(var i=0;i<n.children.length;i++){ var c=n.children[i]; if(c.nodeType===1){ if(c.getAttribute('data-cid')) out.push(c); else d(c); } } })(el); return out; }
+  function lyrName(el){ var t=el.getAttribute('data-type')||''; var base=LTYPE[t]||(t?cap(t):'Group'); var txt='';
+    if(t==='title'||t==='heading'||t==='text'||t==='bar'||t==='stat-callout') txt=(el.textContent||'').replace(/\\s+/g,' ').trim();
+    if(txt) base+=' · '+(txt.length>20?txt.slice(0,19)+'…':txt); return base; }
+  var ICO={
+    text:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7V5h16v2"/><path d="M12 5v14"/><path d="M9 19h6"/></svg>',
+    img:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 16l-5-5L5 20"/></svg>',
+    chart:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V10"/><path d="M12 20V4"/><path d="M19 20v-7"/></svg>',
+    bar:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20V6"/></svg>',
+    table:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg>',
+    list:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r=".7"/><circle cx="4" cy="12" r=".7"/><circle cx="4" cy="18" r=".7"/></svg>',
+    group:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>',
+    metric:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 17l4-10 3 6 2-3 5 7"/></svg>' };
+  function lyrIco(el){ var t=el.getAttribute('data-type')||''; if(t==='title'||t==='heading'||t==='text') return ICO.text; if(t==='image-caption') return ICO.img; if(t==='bar-chart') return ICO.chart; if(t==='bar') return ICO.bar; if(t==='table') return ICO.table; if(t==='bullet-list') return ICO.list; if(t==='stat-callout') return ICO.metric; return ICO.group; }
+  function buildLayers(){
+    var host=document.getElementById('dc-layers'); if(!host) return; host.innerHTML='';
+    var f=frames[cur]; var sec=f&&f.querySelector('section'); if(!sec) return;
+    var selCid=sel?sel.getAttribute('data-cid'):null;
+    (function rows(parent,depth){
+      var kids=cidKids(parent);
+      for(var i=0;i<kids.length;i++){ (function(el){
+        var gk=cidKids(el); var cid=el.getAttribute('data-cid');
+        var row=document.createElement('div'); row.className='dc-layer'+(cid===selCid?' sel':''); row.style.paddingLeft=(6+depth*15)+'px';
+        var tg=document.createElement('span'); tg.className='dc-lyr-tg';
+        if(gk.length){ tg.textContent=LCOLLAPSED[cid]?'▸':'▾'; tg.onclick=function(ev){ ev.stopPropagation(); LCOLLAPSED[cid]=!LCOLLAPSED[cid]; buildLayers(); }; }
+        row.appendChild(tg);
+        var ic=document.createElement('span'); ic.className='dc-lyr-ic'; ic.innerHTML=lyrIco(el); row.appendChild(ic);
+        var nm=document.createElement('span'); nm.className='dc-lyr-nm'; nm.textContent=lyrName(el); row.appendChild(nm);
+        row.onclick=function(){ select(el,{noTab:true}); };
+        row.onmouseenter=function(){ showBox(el); }; row.onmouseleave=function(){ if(!dragging) hideBox(); };
+        host.appendChild(row);
+        if(gk.length&&!LCOLLAPSED[cid]) rows(el,depth+1);
+      })(kids[i]); }
+    })(sec,0);
   }
   function buildTool(cid,type,node){
     tool.className=''; tool.innerHTML='';
@@ -399,6 +452,7 @@ export const CLIENT_JS = `
   function setTab(name){ sessionStorage.setItem('dc-tab',name);
     for(var i=0;i<tabs.length;i++) tabs[i].classList.toggle('dc-act',tabs[i].getAttribute('data-tab')===name);
     for(var j=0;j<panels.length;j++) panels[j].classList.toggle('dc-on',panels[j].getAttribute('data-panel')===name);
+    if(name==='layers') buildLayers();
   }
   for(var i=0;i<tabs.length;i++){ (function(tb){ tb.onclick=function(){ setTab(tb.getAttribute('data-tab')); }; })(tabs[i]); }
 
