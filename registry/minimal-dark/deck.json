@@ -378,36 +378,6 @@
                     "font": "token://font/body",
                     "size": "token://type/h2"
                   }
-                },
-                {
-                  "id": "charts_bar",
-                  "type": "bar-chart",
-                  "role": "chart",
-                  "content": {
-                    "data": [
-                      {
-                        "label": "Q1",
-                        "value": 12
-                      },
-                      {
-                        "label": "Q2",
-                        "value": 19
-                      },
-                      {
-                        "label": "Q3",
-                        "value": 27
-                      },
-                      {
-                        "label": "Q4",
-                        "value": 38
-                      }
-                    ]
-                  },
-                  "style": {
-                    "bar": "token://color/accent",
-                    "labelColor": "token://color/muted",
-                    "color": "token://color/text"
-                  }
                 }
               ]
             },
@@ -469,6 +439,84 @@
                   }
                 }
               ]
+            }
+          ]
+        },
+        {
+          "id": "chart_arr",
+          "type": "bar-chart",
+          "role": "chart",
+          "frame": {
+            "x": 4,
+            "y": 40,
+            "w": 42,
+            "h": 48
+          },
+          "layout": {
+            "direction": "row",
+            "align": "stretch",
+            "gap": "token://space/md"
+          },
+          "children": [
+            {
+              "id": "bar_q1",
+              "type": "bar",
+              "role": "bar",
+              "content": {
+                "barValue": 32,
+                "value": "12",
+                "label": "Q1"
+              },
+              "style": {
+                "color": "token://color/accent",
+                "labelColor": "token://color/muted",
+                "valueColor": "token://color/text"
+              }
+            },
+            {
+              "id": "bar_q2",
+              "type": "bar",
+              "role": "bar",
+              "content": {
+                "barValue": 50,
+                "value": "19",
+                "label": "Q2"
+              },
+              "style": {
+                "color": "token://color/accent",
+                "labelColor": "token://color/muted",
+                "valueColor": "token://color/text"
+              }
+            },
+            {
+              "id": "bar_q3",
+              "type": "bar",
+              "role": "bar",
+              "content": {
+                "barValue": 71,
+                "value": "27",
+                "label": "Q3"
+              },
+              "style": {
+                "color": "token://color/accent",
+                "labelColor": "token://color/muted",
+                "valueColor": "token://color/text"
+              }
+            },
+            {
+              "id": "bar_q4",
+              "type": "bar",
+              "role": "bar",
+              "content": {
+                "barValue": 100,
+                "value": "38",
+                "label": "Q4"
+              },
+              "style": {
+                "color": "token://color/accent",
+                "labelColor": "token://color/muted",
+                "valueColor": "token://color/text"
+              }
             }
           ]
         }
