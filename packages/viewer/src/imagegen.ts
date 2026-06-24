@@ -9,10 +9,22 @@ export async function generateImage(
   apiKey: string,
   size = "1024x1024",
 ): Promise<Buffer> {
+  // Generate a clean cutout (no opaque box): transparent background + isolated subject, so the
+  // picture drops onto a slide as a sticker rather than a dark square.
+  const fullPrompt =
+    prompt.trim() +
+    ". Isolated subject on a fully transparent background, no scenery, no backdrop, centered, generous margins, sticker/cutout style.";
   const res = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: { "content-type": "application/json", authorization: "Bearer " + apiKey },
-    body: JSON.stringify({ model: "gpt-image-1", prompt, size, n: 1 }),
+    body: JSON.stringify({
+      model: "gpt-image-1",
+      prompt: fullPrompt,
+      size,
+      n: 1,
+      background: "transparent",
+      output_format: "png",
+    }),
   });
   if (!res.ok) {
     throw new Error("openai images " + res.status + ": " + (await res.text()).slice(0, 300));

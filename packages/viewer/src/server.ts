@@ -141,9 +141,10 @@ export function createViewerServer(opts: ViewerOptions) {
         const target = op.target ? idx.get(op.target) : undefined;
         // Prefer the on-screen box of the thing being replaced, so the image lands where it was.
         const replacedBox = op.target && op.target === selId ? selBox : undefined;
-        const frame = (op.frame as object) ?? replacedBox ?? target?.node.frame ?? { x: 30, y: 26, w: 40, h: 44 };
+        const frame = (op.frame as object) ?? replacedBox ?? target?.node.frame ?? { x: 34, y: 28, w: 32, h: 40 };
         const alt = prompt.slice(0, 80);
-        const imgNode: DeckNode = { id: newId, type: "image-caption", role: "visual", content: { src, alt }, frame } as DeckNode;
+        // role "sticker" => the compiler shows the whole transparent cutout (object-fit:contain).
+        const imgNode: DeckNode = { id: newId, type: "image-caption", role: "sticker", content: { src, alt }, frame } as DeckNode;
         if (op.mode === "replace" && target) {
           if (target.node.type === "image-caption") {
             out.push({ op: "set_content", nodeId: op.target, content: { src, alt } });

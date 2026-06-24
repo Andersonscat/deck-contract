@@ -160,7 +160,9 @@ function renderLeaf(node: DeckNode): string {
         c.delta ? ` <span class="stat-delta">${esc(c.delta)}</span>` : ""
       }</div></div>`;
     case "image-caption":
-      return `<figure${attrs(node)}><img draggable="false" src="${esc(c.src ?? "")}" alt="${esc(
+      return `<figure${attrs(node)}><img draggable="false"${
+        node.role === "sticker" ? ' style="object-fit:contain;background:transparent"' : ""
+      } src="${esc(c.src ?? "")}" alt="${esc(
         c.alt ?? "",
       )}"/>${c.caption ? `<figcaption>${esc(c.caption)}</figcaption>` : ""}</figure>`;
     case "bar-chart": {
