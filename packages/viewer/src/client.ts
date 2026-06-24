@@ -63,6 +63,8 @@ export const CHROME_CSS = `
 #dc-stage{ flex:1; position:relative; overflow-y:auto; overflow-x:hidden; display:flex; flex-direction:column; align-items:center; gap:24px; padding:30px 0 60px; min-height:0; }
 .dc-frame{ display:block; flex:none; border:1px solid #aeb3bd; background:#000; }
 .dc-frame-sel{ outline:3px solid #ec5a13; outline-offset:3px; border-radius:4px; }
+#dc-stage .dc-entered [data-type="bar"]{ outline:1.5px dashed rgba(236,90,19,.75); outline-offset:2px; border-radius:5px; cursor:pointer; }
+#dc-stage .dc-entered [data-type="bar"]:hover{ outline-color:#ec5a13; background:rgba(236,90,19,.04); }
 .dc-frame > section{ transform-origin:top left; }
 #dc-stage [data-cid]{ cursor:grab; }
 #dc-stage section[data-cid]{ cursor:default; }
@@ -563,13 +565,28 @@ export const CLIENT_JS = `
   // double-click drills in to the individual sub-component (a bar) so you can edit just it.
   var GROUP_TYPES=['bar-chart'];
   function selectTarget(el){ var n=el, group=null; while(n&&n.tagName!=='SECTION'){ if(GROUP_TYPES.indexOf(n.getAttribute('data-type'))>=0) group=n; var p=n.parentElement; n=p?p.closest('#dc-stage [data-cid]'):null; } return group||el; }
+  function closestGroup(el){ var n=el, group=null; while(n&&n.tagName!=='SECTION'){ if(GROUP_TYPES.indexOf(n.getAttribute('data-type'))>=0) group=n; var p=n.parentElement; n=p?p.closest('#dc-stage [data-cid]'):null; } return group; }
+  // Drill-in: clicking a group (bar-chart) "enters" it and decomposes it into its parts
+  // (each bar gets a dashed outline); while entered, a click selects the individual part.
+  var enteredCid=null;
+  function clearEntered(){ var e=document.querySelectorAll('#dc-stage .dc-entered'); for(var i=0;i<e.length;i++) e[i].classList.remove('dc-entered'); enteredCid=null; }
+  function markEntered(grp){ clearEntered(); grp.classList.add('dc-entered'); enteredCid=grp.getAttribute('data-cid'); }
+  // What a pointer at el targets, honouring the entered group (the part, not the whole group).
+  function resolveTarget(el){ if(!el||el.tagName==='SECTION') return el; var g=closestGroup(el); if(g&&enteredCid===g.getAttribute('data-cid')) return el; return g||el; }
   document.addEventListener('click',function(e){
     if(dragged){ dragged=false; return; }
     if(e.target.closest('#dc-topbar')||e.target.closest('#dc-left')||e.target.closest('#dc-right')) return;
     var el=e.target.closest('#dc-stage [data-cid]');
-    if(!el){ clearSel(); return; } // clicked the empty stage gutter -> deselect everything
+    if(!el){ clearEntered(); clearSel(); return; } // empty stage gutter -> deselect + exit any group
     e.preventDefault();
-    if(el.tagName==='SECTION') select(el); else select(selectTarget(el)); // SECTION = the slide itself
+    if(el.tagName==='SECTION'){ clearEntered(); select(el); return; } // the slide itself
+    var grp=closestGroup(el);
+    if(grp){
+      if(enteredCid!==grp.getAttribute('data-cid')){ select(grp); markEntered(grp); } // 1st click: select chart + decompose it
+      else { select(el); } // already entered: select the clicked part (a bar)
+      return;
+    }
+    clearEntered(); select(selectTarget(el));
   });
   // hover frame + free drag (move by coordinates -> set_frame / move_to)
   var dragHover=null, candEl=null, downPt=null, dragging=false, dragNode=null, dragged=false;
@@ -579,7 +596,7 @@ export const CLIENT_JS = `
   function showBox(el){ var h=hbox(); var r=el.getBoundingClientRect(); h.className=''; h.style.display='block'; h.style.left=r.left+'px'; h.style.top=r.top+'px'; h.style.width=r.width+'px'; h.style.height=r.height+'px'; }
   function hideBox(){ if(dragHover) dragHover.style.display='none'; }
   function round3(n){ return Math.round(n*1000)/1000; }
-  stage.addEventListener('mousemove',function(e){ if(dragging) return; var el=e.target.closest('#dc-stage [data-cid]'); var tgt=(el&&el.tagName!=='SECTION')?selectTarget(el):null; if(tgt) showBox(tgt); else hideBox(); if(layersOn()) highlightLayer(tgt?tgt.getAttribute('data-cid'):null); });
+  stage.addEventListener('mousemove',function(e){ if(dragging) return; var el=e.target.closest('#dc-stage [data-cid]'); var tgt=(el&&el.tagName!=='SECTION')?resolveTarget(el):null; if(tgt) showBox(tgt); else hideBox(); if(layersOn()) highlightLayer(tgt?tgt.getAttribute('data-cid'):null); });
   stage.addEventListener('mouseleave',function(){ if(!dragging) hideBox(); if(layersOn()) highlightLayer(null); });
   stage.addEventListener('mousedown',function(e){ var el=e.target.closest('#dc-stage [data-cid]'); if(!el||el.tagName==='SECTION') return; candEl=selectTarget(el); downPt={x:e.clientX,y:e.clientY}; dragged=false; });
   document.addEventListener('mousemove',function(e){
