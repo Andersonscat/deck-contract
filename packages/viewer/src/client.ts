@@ -178,7 +178,7 @@ export const CLIENT_JS = `
     if(!tool) return;
     tool.className=''; tool.innerHTML='';
     var lbl=document.createElement('span'); lbl.className='dc-lbl'; lbl.textContent='Insert'; tool.appendChild(lbl);
-    [['heading','Text'],['stat-callout','Metric'],['bullet-list','List'],['image-caption','Image']].forEach(function(a){ var b=document.createElement('button'); b.type='button'; b.className='dc-add'; b.textContent=a[1]; b.onclick=function(ev){ ev.stopPropagation(); var pid=curSlideId(); if(!pid) return; post('/api/insert_block',{blockId:a[0],parentId:pid,index:999}).then(function(res){ if(res&&res.error) flash('error: '+res.error); else flash('added'); }); }; tool.appendChild(b); });
+    [['heading','Text'],['image-caption','Image']].forEach(function(a){ var b=document.createElement('button'); b.type='button'; b.className='dc-add'; b.textContent=a[1]; b.onclick=function(ev){ ev.stopPropagation(); var pid=curSlideId(); if(!pid) return; post('/api/insert_block',{blockId:a[0],parentId:pid,index:999}).then(function(res){ if(res&&res.error) flash('error: '+res.error); else flash('added'); }); }; tool.appendChild(b); });
   }
   function editText(el){ var orig=el.textContent||''; el.setAttribute('contenteditable','true'); el.focus(); var cid=el.getAttribute('data-cid');
     function finish(){ el.removeAttribute('contenteditable'); var txt=(el.textContent||'').trim();
