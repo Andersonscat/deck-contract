@@ -243,7 +243,8 @@ function renderSlide(slide: DeckNode, canvas: { width: number; height: number })
 const BASE_CSS = `*{margin:0;box-sizing:border-box;animation:none!important;transition:none!important}
 html,body{padding:0}
 .slide{position:relative;overflow:hidden;font-family:var(--font-body);color:var(--color-text)}
-.slide img{max-width:100%;display:block;-webkit-user-drag:none;user-select:none}
+.slide figure{overflow:hidden}
+.slide img{display:block;width:100%;height:100%;object-fit:cover;-webkit-user-drag:none;user-select:none}
 ul{list-style:disc;padding-left:1.2em}
 ul li::marker{color:var(--marker-color)}
 .bar-chart{display:flex;align-items:flex-end;gap:18px;width:100%}
