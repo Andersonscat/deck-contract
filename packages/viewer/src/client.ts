@@ -23,6 +23,7 @@ export const CHROME_CSS = `
 #dc-layers{ display:flex; flex-direction:column; }
 .dc-layer{ display:flex; align-items:center; gap:6px; height:28px; padding-right:8px; border-radius:6px; cursor:pointer; color:#3a3f4a; font-size:13px; white-space:nowrap; overflow:hidden; }
 .dc-layer:hover{ background:#f3f4f6; }
+.dc-layer.hov:not(.sel){ background:#fee9df; box-shadow:inset 2px 0 0 #ec5a13; }
 .dc-layer.sel{ background:#ec5a13; color:#fff; }
 .dc-lyr-tg{ width:18px; height:22px; flex:none; color:#9298a3; font-size:10px; display:flex; align-items:center; justify-content:center; border-radius:4px; cursor:pointer; transition:color .1s,background .1s; }
 .dc-lyr-tg:hover{ color:#1f2330; background:rgba(0,0,0,.06); }
@@ -362,7 +363,7 @@ export const CLIENT_JS = `
       var kids=cidKids(parent);
       for(var i=0;i<kids.length;i++){ (function(el){
         var gk=cidKids(el); var cid=el.getAttribute('data-cid');
-        var row=document.createElement('div'); row.className='dc-layer'+(cid===selCid?' sel':''); row.style.paddingLeft=(6+depth*15)+'px';
+        var row=document.createElement('div'); row.className='dc-layer'+(cid===selCid?' sel':''); row.setAttribute('data-cid',cid); row.style.paddingLeft=(6+depth*15)+'px';
         var tg=document.createElement('span'); tg.className='dc-lyr-tg';
         function toggle(){ LCOLLAPSED[cid]=!LCOLLAPSED[cid]; buildLayers(); }
         if(gk.length){ tg.textContent=LCOLLAPSED[cid]?'▸':'▾'; tg.title=LCOLLAPSED[cid]?'Expand':'Collapse'; tg.onclick=function(ev){ ev.stopPropagation(); toggle(); }; }
@@ -376,6 +377,12 @@ export const CLIENT_JS = `
         if(gk.length&&!LCOLLAPSED[cid]) rows(el,depth+1);
       })(kids[i]); }
     })(sec,0);
+  }
+  // Hovering a component on the canvas highlights its row in the Layers tree.
+  function highlightLayer(cid){
+    var host=document.getElementById('dc-layers'); if(!host) return;
+    var prev=host.querySelectorAll('.dc-layer.hov'); for(var i=0;i<prev.length;i++) prev[i].classList.remove('hov');
+    if(!cid) return; var row=host.querySelector('.dc-layer[data-cid="'+cid+'"]'); if(row){ row.classList.add('hov'); row.scrollIntoView({block:'nearest'}); }
   }
   function buildTool(cid,type,node){
     tool.className=''; tool.innerHTML='';
@@ -571,8 +578,8 @@ export const CLIENT_JS = `
   function showBox(el){ var h=hbox(); var r=el.getBoundingClientRect(); h.className=''; h.style.display='block'; h.style.left=r.left+'px'; h.style.top=r.top+'px'; h.style.width=r.width+'px'; h.style.height=r.height+'px'; }
   function hideBox(){ if(dragHover) dragHover.style.display='none'; }
   function round3(n){ return Math.round(n*1000)/1000; }
-  stage.addEventListener('mousemove',function(e){ if(dragging) return; var el=e.target.closest('#dc-stage [data-cid]'); if(el&&el.tagName!=='SECTION') showBox(selectTarget(el)); else hideBox(); });
-  stage.addEventListener('mouseleave',function(){ if(!dragging) hideBox(); });
+  stage.addEventListener('mousemove',function(e){ if(dragging) return; var el=e.target.closest('#dc-stage [data-cid]'); var tgt=(el&&el.tagName!=='SECTION')?selectTarget(el):null; if(tgt) showBox(tgt); else hideBox(); if(layersOn()) highlightLayer(tgt?tgt.getAttribute('data-cid'):null); });
+  stage.addEventListener('mouseleave',function(){ if(!dragging) hideBox(); if(layersOn()) highlightLayer(null); });
   stage.addEventListener('mousedown',function(e){ var el=e.target.closest('#dc-stage [data-cid]'); if(!el||el.tagName==='SECTION') return; candEl=selectTarget(el); downPt={x:e.clientX,y:e.clientY}; dragged=false; });
   document.addEventListener('mousemove',function(e){
     if(resizing){ doResize(e); return; }
