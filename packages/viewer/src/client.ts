@@ -679,7 +679,12 @@ export const CLIENT_JS = `
   var dragStart=null, dragSc=1, dragHasFrame=false, coordEl=null, dragLast=null;
   function hbox(){ if(!dragHover){ dragHover=document.createElement('div'); dragHover.id='dc-hover'; document.body.appendChild(dragHover); } return dragHover; }
   function cbox(){ if(!coordEl){ coordEl=document.createElement('div'); coordEl.id='dc-coord'; document.body.appendChild(coordEl); } return coordEl; }
-  function showBox(el){ if(!el) return; var r=el.getBoundingClientRect(); if(r.width<1&&r.height<1){ hideBox(); return; } var h=hbox(); h.className=''; h.style.display='block'; h.style.left=r.left+'px'; h.style.top=r.top+'px'; h.style.width=r.width+'px'; h.style.height=r.height+'px'; }
+  // Trackpad pinch-zoom pans/scales the VISUAL viewport, which lives in a different coordinate
+  // space than position:fixed (anchored to the LAYOUT viewport). A fixed overlay positioned from
+  // getBoundingClientRect can't be reconciled with that reliably, so while pinched we simply don't
+  // draw fixed overlays (hover box, resize handles) — the on-element selection outline still shows.
+  function isPinched(){ var v=window.visualViewport; return !!v && (Math.abs(v.scale-1)>0.01 || v.offsetLeft>1 || v.offsetTop>1); }
+  function showBox(el){ if(!el||isPinched()){ hideBox(); return; } var r=el.getBoundingClientRect(); if(r.width<1&&r.height<1){ hideBox(); return; } var h=hbox(); h.className=''; h.style.display='block'; h.style.left=r.left+'px'; h.style.top=r.top+'px'; h.style.width=r.width+'px'; h.style.height=r.height+'px'; }
   function hideBox(){ if(dragHover) dragHover.style.display='none'; }
   function round3(n){ return Math.round(n*1000)/1000; }
   var NO_HOVER={'two-column':1,'container':1,'slide':1};
@@ -858,6 +863,7 @@ export const CLIENT_JS = `
   }
   function positionHandles(){
     if(!sel||sel.tagName==='SECTION'){ hideHandles(); return; }
+    if(isPinched()){ hideHandles(); return; } // fixed overlays can't be aligned under pinch-zoom
     // While you're INSIDE a group (editing its parts), don't show its resize handles — that's
     // clutter over the atoms. Esc out of the group to resize it.
     if(enteredCid&&sel.getAttribute('data-cid')===enteredCid){ hideHandles(); return; }
