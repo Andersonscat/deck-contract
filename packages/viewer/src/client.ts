@@ -105,6 +105,18 @@ export const CHROME_CSS = `
 .dc-dd-trg{ height:34px; min-width:60px; display:flex; align-items:center; justify-content:space-between; gap:9px; border:1px solid #e6e8ee; background:#fff; border-radius:10px; padding:0 11px; cursor:pointer; font-size:13px; color:#1f2330; transition:background .12s,border-color .12s; }
 .dc-num{ width:62px; height:34px; border:1px solid #e6e8ee; background:#fff; border-radius:10px; padding:0 9px; font-size:13px; color:#1f2330; }
 .dc-num:focus{ outline:none; border-color:#c7cbd3; }
+/* modern font-size control: editable px + scale steppers + named-size menu (no native spinner) */
+.dc-size{ display:flex; align-items:center; height:34px; border:1px solid #e6e8ee; background:#fff; border-radius:10px; padding:0 3px 0 11px; transition:border-color .12s; }
+.dc-size:focus-within{ border-color:#c7cbd3; }
+.dc-size input{ width:26px; border:none; background:none; outline:none; font:600 13px/1 -apple-system,Segoe UI,sans-serif; color:#1f2330; text-align:center; font-variant-numeric:tabular-nums; padding:0; -moz-appearance:textfield; }
+.dc-size input::-webkit-outer-spin-button,.dc-size input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+.dc-stp{ display:flex; flex-direction:column; margin-left:1px; }
+.dc-stp button{ width:18px; height:13px; display:flex; align-items:center; justify-content:center; border:none; background:none; color:#aeb4bf; cursor:pointer; padding:0; border-radius:4px; transition:background .1s,color .1s; }
+.dc-stp button:hover{ background:#f2f3f5; color:#1f2330; }
+.dc-szmenu{ width:24px; height:28px; display:flex; align-items:center; justify-content:center; border:none; background:none; color:#aeb4bf; cursor:pointer; border-radius:7px; transition:background .1s,color .1s; }
+.dc-szmenu:hover{ background:#f2f3f5; color:#1f2330; }
+.dc-size .dc-dd-menu{ right:0; left:auto; min-width:152px; }
+.dc-dd-item .dc-szpx{ margin-left:auto; color:#9aa0aa; font-size:12px; font-variant-numeric:tabular-nums; }
 .dc-dd-trg:hover{ background:#f6f7f9; border-color:#dcdfe6; }
 .dc-cv{ width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; border-top:5px solid #aab0bb; }
 .dc-dd-menu{ position:absolute; top:calc(100% + 6px); left:0; min-width:128px; max-height:266px; overflow:auto; display:none; flex-direction:column; gap:1px; background:#fff; border:1px solid #e6e8ee; border-radius:12px; padding:6px; z-index:100; }
@@ -294,14 +306,35 @@ export const CLIENT_JS = `
       if(r&&r.cid===cid){ lastTextSel=null; op([{op:'format_range',nodeId:cid,target:{from:r.from,to:r.to},prop:prop,value:value}]); return; } }
     op([{op:'set_token',nodeId:cid,prop:prop,value:value}]);
   }
-  // Free-typed font size: the server mints a theme token for that px on the fly (so style stays
-  // token-only) and applies it to the node (or to the selected text range).
-  function sizeInput(cid,prop,curPx){
-    var inp=document.createElement('input'); inp.type='number'; inp.className='dc-num'; inp.value=curPx||''; inp.min='4'; inp.max='400'; inp.step='1';
-    function go(){ var v=parseInt(inp.value,10); if(!v||v<4||v>400){ inp.value=curPx||''; return; } applySize(cid,prop,v); }
-    inp.addEventListener('keydown',function(k){ if(k.key==='Enter'){ k.preventDefault(); inp.blur(); } });
-    inp.addEventListener('change',go);
-    return inp;
+  // The deck's named TYPE SCALE (Display/H1/H2/Body/Caption…), sorted by px. Minted one-off px
+  // keys (numeric) are excluded so they never pollute the role ladder you step/pick through.
+  function typeScale(){ var t=(window.DC_THEME&&window.DC_THEME.type)||{}; var arr=[]; for(var k in t){ if(t.hasOwnProperty(k)&&isNaN(Number(k))){ arr.push({key:k,px:parseInt(t[k],10)||0}); } } arr.sort(function(a,b){ return a.px-b.px; }); return arr; }
+  // Step to the next/prev step of the named scale. If px isn't on the scale, jump to the nearest
+  // step in that direction (snap), like Figma/Slides stepping — never mints a one-off token.
+  function scaleStep(sc,px,dir){ if(!sc.length) return -1; for(var i=0;i<sc.length;i++){ if(sc[i].px===px) return Math.max(0,Math.min(sc.length-1,i+dir)); } if(dir>0){ for(var j=0;j<sc.length;j++){ if(sc[j].px>px) return j; } return sc.length-1; } for(var m=sc.length-1;m>=0;m--){ if(sc[m].px<px) return m; } return 0; }
+  function stepSize(cid,prop,curPx,dir){ var sc=typeScale(); var i=scaleStep(sc,curPx,dir); if(i<0){ applySize(cid,prop,Math.max(4,Math.min(400,(curPx||16)+dir*2))); return; } applyToken(cid,prop,'token://type/'+sc[i].key); }
+  var SZ_UP='<svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2 5 3.7l2.5 2.5"/></svg>';
+  var SZ_DN='<svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 3.8 5 6.3l2.5-2.5"/></svg>';
+  // Font size, no native spinner: type any px (mints), step the named scale (chevrons / Up-Down
+  // arrows), or pick a named size from the menu. For flow text with no handles, THIS is the resize.
+  function buildSizeControl(cid,prop,curPx){
+    var wrap=document.createElement('div'); wrap.className='dc-size'; wrap.title='Font size — type a value, step the scale, or pick a named size';
+    var inp=document.createElement('input'); inp.type='text'; inp.inputMode='numeric'; inp.value=curPx||'';
+    function cur(){ return parseInt(inp.value,10)||curPx||16; }
+    inp.addEventListener('change',function(){ var v=parseInt(inp.value,10); if(!v||v<4||v>400){ inp.value=curPx||''; return; } applySize(cid,prop,v); });
+    inp.addEventListener('keydown',function(k){ if(k.key==='Enter'){ k.preventDefault(); inp.blur(); } else if(k.key==='ArrowUp'){ k.preventDefault(); stepSize(cid,prop,cur(),1); } else if(k.key==='ArrowDown'){ k.preventDefault(); stepSize(cid,prop,cur(),-1); } });
+    var stp=document.createElement('div'); stp.className='dc-stp';
+    var up=document.createElement('button'); up.type='button'; up.innerHTML=SZ_UP; up.title='Larger'; up.onclick=function(ev){ ev.stopPropagation(); stepSize(cid,prop,cur(),1); };
+    var dn=document.createElement('button'); dn.type='button'; dn.innerHTML=SZ_DN; dn.title='Smaller'; dn.onclick=function(ev){ ev.stopPropagation(); stepSize(cid,prop,cur(),-1); };
+    stp.appendChild(up); stp.appendChild(dn);
+    var dd=document.createElement('div'); dd.className='dc-dd';
+    var mbtn=document.createElement('button'); mbtn.type='button'; mbtn.className='dc-szmenu'; mbtn.title='Named sizes'; mbtn.innerHTML='<span class="dc-cv"></span>';
+    var menu=document.createElement('div'); menu.className='dc-dd-menu';
+    typeScale().forEach(function(s){ var it=document.createElement('button'); it.type='button'; it.className='dc-dd-item'+(s.px===Number(curPx)?' sel':''); it.innerHTML='<span>'+cap(s.key)+'</span><span class="dc-szpx">'+s.px+'</span>'; it.onclick=function(ev){ ev.stopPropagation(); menu.classList.remove('on'); applyToken(cid,prop,'token://type/'+s.key); }; menu.appendChild(it); });
+    mbtn.onclick=function(ev){ ev.stopPropagation(); var willOpen=!menu.classList.contains('on'); var all=document.querySelectorAll('.dc-dd-menu.on'); for(var i=0;i<all.length;i++) all[i].classList.remove('on'); if(willOpen) menu.classList.add('on'); };
+    dd.appendChild(mbtn); dd.appendChild(menu);
+    wrap.appendChild(inp); wrap.appendChild(stp); wrap.appendChild(dd);
+    return wrap;
   }
   function applySize(cid,prop,px){
     var r=(prop==='size')?(computeTextRange()||lastTextSel):null;
@@ -428,7 +461,7 @@ export const CLIENT_JS = `
     if(type==='slide'){ buildSlideTool(cid,node); return; }
     var sp=styleProps(type); var th=window.DC_THEME||{}; var st=(node&&node.style)||{}; var cf=contentField(type);
     if(sp.font){ var ffs=(th.font||[]).filter(function(k){ return k!=='heading'&&k!=='body'; }); tool.appendChild(group('Font', makeDropdown({ value:tokenKey(st[sp.font]), labelFor:fontLabel, items:ffs.map(function(k){ return {v:k,label:fontLabel(k),face:'var(--font-'+k+')'}; }), onSelect:function(v){ applyToken(cid,sp.font,'token://font/'+v); } }))); }
-    if(sp.size){ var curPx=(th.type||{})[tokenKey(st[sp.size])]||''; tool.appendChild(group('Size', sizeInput(cid,sp.size,curPx))); }
+    if(sp.size){ var curPx=(th.type||{})[tokenKey(st[sp.size])]||''; tool.appendChild(group('Size', buildSizeControl(cid,sp.size,curPx))); }
     if(sp.color){ var cols=th.color||{}; var ck=Object.keys(cols); tool.appendChild(group('Color', makeDropdown({ value:tokenKey(st[sp.color]), items:ck.map(function(k){ return {v:k,label:cap(k),swatch:cols[k]}; }), onSelect:function(v){ applyToken(cid,sp.color,'token://color/'+v); } }))); }
     if(cf==='text'||cf==='items'){ tool.appendChild(alignSeg(cid,(node&&node.textAlign)||'left')); }
     tool.appendChild(insertBtn('Text','heading'));
