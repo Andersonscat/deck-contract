@@ -65,6 +65,8 @@ export const CHROME_CSS = `
 .dc-frame-sel{ outline:3px solid #ec5a13; outline-offset:3px; border-radius:4px; }
 #dc-stage .dc-atom{ outline:1.5px dashed rgba(236,90,19,.75); outline-offset:2px; border-radius:5px; cursor:pointer; }
 #dc-stage .dc-atom:hover{ outline-color:#ec5a13; background:rgba(236,90,19,.05); }
+#dc-wordhl{ position:fixed; left:0; top:0; pointer-events:none; z-index:60; }
+.dc-wordhl-b{ position:fixed; background:rgba(236,90,19,.16); border-bottom:2px solid #ec5a13; border-radius:2px; }
 .dc-frame > section{ transform-origin:top left; }
 #dc-stage [data-cid]{ cursor:grab; }
 #dc-stage section[data-cid]{ cursor:default; }
@@ -174,7 +176,7 @@ export const CLIENT_JS = `
   var TOOL_EMPTY='Select an element to edit it';
   function setHead(t){ var h=document.getElementById('dc-chat-head'); if(h) h.textContent=t; }
   function deleteNode(cid){ if(!cid) return; clearSel(); op([{op:'remove_node',nodeId:cid}]).then(function(){ flash('deleted'); }); }
-  function clearSel(){ var n=document.querySelectorAll('.dc-selected'); for(var i=0;i<n.length;i++) n[i].classList.remove('dc-selected'); var fs=document.querySelectorAll('.dc-frame-sel'); for(var k=0;k<fs.length;k++) fs[k].classList.remove('dc-frame-sel'); sel=null; setHead('AI assistant'); buildDefaultTool(); hideHandles(); restoreElements(); if(layersOn()) buildLayers(); }
+  function clearSel(){ var n=document.querySelectorAll('.dc-selected'); for(var i=0;i<n.length;i++) n[i].classList.remove('dc-selected'); var fs=document.querySelectorAll('.dc-frame-sel'); for(var k=0;k<fs.length;k++) fs[k].classList.remove('dc-frame-sel'); sel=null; setHead('AI assistant'); buildDefaultTool(); hideHandles(); restoreElements(); hideWordHover(); if(layersOn()) buildLayers(); }
   // when nothing is selected the top bar still shows useful content (insert actions)
   function buildDefaultTool(){
     if(!tool) return;
@@ -182,12 +184,14 @@ export const CLIENT_JS = `
     var lbl=document.createElement('span'); lbl.className='dc-lbl'; lbl.textContent='Insert'; tool.appendChild(lbl);
     [['heading','Text'],['image-caption','Image']].forEach(function(a){ var b=document.createElement('button'); b.type='button'; b.className='dc-add'; b.textContent=a[1]; b.onclick=function(ev){ ev.stopPropagation(); var pid=curSlideId(); if(!pid) return; post('/api/insert_block',{blockId:a[0],parentId:pid,index:999}).then(function(res){ if(res&&res.error) flash('error: '+res.error); else flash('added'); }); }; tool.appendChild(b); });
   }
-  function editText(el){ var orig=el.textContent||''; el.setAttribute('contenteditable','true'); el.focus(); var cid=el.getAttribute('data-cid');
-    function finish(){ el.removeAttribute('contenteditable'); var txt=(el.textContent||'').trim();
+  function editText(el,pt){ enteredText=el; var orig=el.textContent||''; el.setAttribute('contenteditable','true'); el.focus(); var cid=el.getAttribute('data-cid');
+    // default-select the WORD under the cursor — the most likely intent on entering text.
+    if(pt){ var off=offsetAtPoint(el,pt.x,pt.y); var wr=wordRangeAt(el.textContent||'',off); if(wr) selectTextRange(el,wr.from,wr.to); }
+    function finish(){ el.removeAttribute('contenteditable'); if(enteredText===el) enteredText=null; hideWordHover(); var txt=(el.textContent||'').trim();
       // commit text ONLY if it actually changed — otherwise we'd needlessly drop any sub-text marks
       if(txt!==orig.trim()) post('/api/op',{ops:[{op:'set_text',nodeId:cid,value:txt}]}).then(function(res){ if(res&&res.error) flash('error: '+res.error); }); }
     el.addEventListener('blur',finish,{once:true});
-    el.addEventListener('keydown',function(k){ if(k.key==='Enter'){ k.preventDefault(); el.blur(); } });
+    el.addEventListener('keydown',function(k){ if(k.key==='Enter'){ k.preventDefault(); el.blur(); } else if(k.key==='Escape'){ k.preventDefault(); k.stopPropagation(); el.blur(); select(el); } }); // Esc: range -> whole-node (stop the doc handler from also popping it)
   }
   // contextual toolbar: which style props each component type exposes, and its text field
   function styleProps(type){
@@ -258,6 +262,31 @@ export const CLIENT_JS = `
     return { cid:el.getAttribute('data-cid'), from:from, to:to };
   }
   document.addEventListener('selectionchange',function(){ var r=computeTextRange(); if(r) lastTextSel=r; });
+
+  // ---- Selection model: { nodeId, from?, to? }. No range = the whole node (object level);
+  // with range = a span of THIS node's text. Words/letters are character ranges computed from
+  // the string on the fly — never separate levels or nodes. enteredText = the node we are inside
+  // (null at object level). Native contenteditable gives dblclick-word / drag-range / Cmd+A-all;
+  // we add the model, the contextual word-hover, default-to-word on enter, and Esc-pop. ----
+  var enteredText=null;
+  function caretPos(x,y){ if(document.caretPositionFromPoint){ var p=document.caretPositionFromPoint(x,y); return p?{node:p.offsetNode,offset:p.offset}:null; } if(document.caretRangeFromPoint){ var r=document.caretRangeFromPoint(x,y); return r?{node:r.startContainer,offset:r.startOffset}:null; } return null; }
+  function offsetAtPoint(el,x,y){ var p=caretPos(x,y); if(!p||!el.contains(p.node)) return -1; var w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT,null),n,idx=0; while((n=w.nextNode())){ if(n===p.node) return idx+p.offset; idx+=(n.nodeValue||'').length; } return -1; }
+  function domPosAt(el,off){ var w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT,null),n,idx=0; while((n=w.nextNode())){ var len=(n.nodeValue||'').length; if(off<=idx+len) return {node:n,offset:off-idx}; idx+=len; } return {node:el,offset:0}; }
+  function isWordChar(c){ return !!c && /[^\\s.,;:!?()\\[\\]{}"'«»…—–\\/\\\\|]/.test(c); }
+  // The word (whitespace/punctuation tokenized) containing offset; a separator -> a width-1 range.
+  function wordRangeAt(text,off){ if(off<0) return null; if(off>text.length) off=text.length;
+    if(off<text.length && !isWordChar(text.charAt(off))) return {from:off,to:off+1};
+    var from=off,to=off; while(from>0 && isWordChar(text.charAt(from-1))) from--; while(to<text.length && isWordChar(text.charAt(to))) to++;
+    if(from===to) return off<text.length?{from:off,to:off+1}:null; return {from:from,to:to}; }
+  function selectTextRange(el,from,to){ try{ var a=domPosAt(el,from),b=domPosAt(el,to); var r=document.createRange(); r.setStart(a.node,a.offset); r.setEnd(b.node,b.offset); var s=window.getSelection(); s.removeAllRanges(); s.addRange(r); lastTextSel={cid:el.getAttribute('data-cid'),from:from,to:to}; }catch(e){} }
+  // Word-hover overlay (distinct from the object outline and the blue range selection).
+  var wordHl=null;
+  function showWordHover(el,from,to){ try{ var a=domPosAt(el,from),b=domPosAt(el,to); var r=document.createRange(); r.setStart(a.node,a.offset); r.setEnd(b.node,b.offset); var rects=r.getClientRects(); if(!wordHl){ wordHl=document.createElement('div'); wordHl.id='dc-wordhl'; document.body.appendChild(wordHl); } wordHl.innerHTML=''; wordHl.style.display='block'; for(var i=0;i<rects.length;i++){ var c=rects[i]; var d=document.createElement('div'); d.className='dc-wordhl-b'; d.style.left=c.left+'px'; d.style.top=c.top+'px'; d.style.width=c.width+'px'; d.style.height=c.height+'px'; wordHl.appendChild(d); } }catch(e){} }
+  function hideWordHover(){ if(wordHl) wordHl.style.display='none'; }
+  // ONE output for mouse and AI: nodeId + optional range. No range -> whole-node (set_token);
+  // range -> a character span (format_range). Exposed for voice/AI targeting too.
+  function currentSelection(){ if(enteredText){ var cid=enteredText.getAttribute('data-cid'); var r=computeTextRange()||lastTextSel; return (r&&r.cid===cid)?{nodeId:cid,from:r.from,to:r.to}:{nodeId:cid}; } if(sel&&sel.tagName!=='SECTION') return {nodeId:sel.getAttribute('data-cid')}; return null; }
+  window.dcSelection=currentSelection;
   function applyToken(cid,prop,value){
     if(prop==='color'||prop==='font'||prop==='size'){ var r=computeTextRange()||lastTextSel;
       if(r&&r.cid===cid){ lastTextSel=null; op([{op:'format_range',nodeId:cid,target:{from:r.from,to:r.to},prop:prop,value:value}]); return; } }
@@ -506,6 +535,7 @@ export const CLIENT_JS = `
     if(mod&&(e.key==='d'||e.key==='D')){ if(sel){ e.preventDefault(); doDuplicate(); } return; }
     if(e.key==='ArrowDown'){ e.preventDefault(); goTo(Math.min(cur+1,frames.length-1)); }
     if(e.key==='ArrowUp'){ e.preventDefault(); goTo(Math.max(cur-1,0)); }
+    if(e.key==='Escape'){ if(enteredCid){ e.preventDefault(); clearEntered(); } else if(sel){ e.preventDefault(); clearSel(); } return; } // pop up: group/object -> nothing
     if((e.key==='Delete'||e.key==='Backspace')&&sel){ e.preventDefault(); if(sel.tagName==='SECTION') deleteSlide(sel.getAttribute('data-cid')); else deleteNode(sel.getAttribute('data-cid')); }
   });
 
@@ -592,6 +622,8 @@ export const CLIENT_JS = `
   document.addEventListener('click',function(e){
     if(dragged){ dragged=false; return; }
     if(e.target.closest('#dc-topbar')||e.target.closest('#dc-left')||e.target.closest('#dc-right')) return;
+    // While inside an entered text node, a click just moves the caret — don't re-select the object.
+    if(enteredText&&enteredText.contains(e.target)) return;
     var el=e.target.closest('#dc-stage [data-cid]');
     if(!el){ clearEntered(); clearSel(); return; } // empty stage gutter -> deselect + exit any group
     e.preventDefault();
@@ -608,7 +640,11 @@ export const CLIENT_JS = `
   function showBox(el){ var h=hbox(); var r=el.getBoundingClientRect(); h.className=''; h.style.display='block'; h.style.left=r.left+'px'; h.style.top=r.top+'px'; h.style.width=r.width+'px'; h.style.height=r.height+'px'; }
   function hideBox(){ if(dragHover) dragHover.style.display='none'; }
   function round3(n){ return Math.round(n*1000)/1000; }
-  stage.addEventListener('mousemove',function(e){ if(dragging) return; var el=e.target.closest('#dc-stage [data-cid]'); var tgt=(el&&el.tagName!=='SECTION')?resolveTarget(el):null; if(tgt) showBox(tgt); else hideBox(); if(layersOn()) highlightLayer(tgt?tgt.getAttribute('data-cid'):null); });
+  stage.addEventListener('mousemove',function(e){ if(dragging) return;
+    // Hover = exactly ONE level deeper than the current context. Inside an entered text node we
+    // highlight only WORDS within THAT node; nothing else lights up. Otherwise: whole objects.
+    if(enteredText){ var off=offsetAtPoint(enteredText,e.clientX,e.clientY); var wr=(off>=0)?wordRangeAt(enteredText.textContent||'',off):null; if(wr) showWordHover(enteredText,wr.from,wr.to); else hideWordHover(); hideBox(); return; }
+    var el=e.target.closest('#dc-stage [data-cid]'); var tgt=(el&&el.tagName!=='SECTION')?resolveTarget(el):null; if(tgt) showBox(tgt); else hideBox(); if(layersOn()) highlightLayer(tgt?tgt.getAttribute('data-cid'):null); });
   stage.addEventListener('mouseleave',function(){ if(!dragging) hideBox(); if(layersOn()) highlightLayer(null); });
   stage.addEventListener('mousedown',function(e){ var el=e.target.closest('#dc-stage [data-cid]'); if(!el||el.tagName==='SECTION') return; candEl=selectTarget(el); downPt={x:e.clientX,y:e.clientY}; dragged=false; });
   document.addEventListener('mousemove',function(e){
@@ -828,7 +864,8 @@ export const CLIENT_JS = `
 
   // close any open custom dropdown when clicking elsewhere
   document.addEventListener('click',function(e){ if(e.target.closest('.dc-dd')) return; var m=document.querySelectorAll('.dc-dd-menu.on'); for(var i=0;i<m.length;i++) m[i].classList.remove('on'); });
-  document.addEventListener('dblclick',function(e){ var el=e.target.closest('#dc-stage [data-cid]'); if(!el||el.tagName==='SECTION') return; var type=el.getAttribute('data-type'); e.preventDefault(); if(type==='title'||type==='heading'||type==='bar-value'||type==='bar-label') editText(el); else select(el); });
+  var TEXT_EDIT={title:1,heading:1,subtitle:1,text:1,'bar-value':1,'bar-label':1};
+  document.addEventListener('dblclick',function(e){ var el=e.target.closest('#dc-stage [data-cid]'); if(!el||el.tagName==='SECTION') return; var type=el.getAttribute('data-type'); e.preventDefault(); if(TEXT_EDIT[type]) editText(el,{x:e.clientX,y:e.clientY}); else select(el); });
 
   // AI chat — tells the model which slide is in view
   var chat=document.getElementById('dc-chat');
