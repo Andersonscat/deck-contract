@@ -646,7 +646,12 @@ export const CLIENT_JS = `
     if(enteredText){ var off=offsetAtPoint(enteredText,e.clientX,e.clientY); var wr=(off>=0)?wordRangeAt(enteredText.textContent||'',off):null; if(wr) showWordHover(enteredText,wr.from,wr.to); else hideWordHover(); hideBox(); return; }
     var el=e.target.closest('#dc-stage [data-cid]'); var tgt=(el&&el.tagName!=='SECTION')?resolveTarget(el):null; if(tgt) showBox(tgt); else hideBox(); if(layersOn()) highlightLayer(tgt?tgt.getAttribute('data-cid'):null); });
   stage.addEventListener('mouseleave',function(){ if(!dragging) hideBox(); if(layersOn()) highlightLayer(null); });
-  stage.addEventListener('mousedown',function(e){ var el=e.target.closest('#dc-stage [data-cid]'); if(!el||el.tagName==='SECTION') return; candEl=selectTarget(el); downPt={x:e.clientX,y:e.clientY}; dragged=false; });
+  // A "free" element is framed AND positioned by the slide itself (offsetParent = the section).
+  // A framed element NESTED in another framed one (e.g. an image inside a bar-chart) has its
+  // parent as offsetParent, so the slide-relative drag/resize math doesn't apply — it is
+  // structural (positioned by its container), not freely movable.
+  function isFreeEl(el){ if(!el||el.tagName==='SECTION') return false; if(getComputedStyle(el).position!=='absolute') return false; var p=el.parentElement?el.parentElement.closest('#dc-stage [data-cid]'):null; return !p||p.tagName==='SECTION'; }
+  stage.addEventListener('mousedown',function(e){ var el=e.target.closest('#dc-stage [data-cid]'); if(!el||el.tagName==='SECTION') return; var t=selectTarget(el); if(getComputedStyle(t).position==='absolute' && !isFreeEl(t)) return; candEl=t; downPt={x:e.clientX,y:e.clientY}; dragged=false; });
   document.addEventListener('mousemove',function(e){
     if(resizing){ doResize(e); return; }
     if(dragging){ var s=snapDrag(e); dragLast=s; applyDragVisual(s); return; }
@@ -808,7 +813,7 @@ export const CLIENT_JS = `
     // Resize handles are only for FREE (framed, position:absolute) elements. Flow elements — bars,
     // their atoms, an image inside a bar, container children — are laid out by their parent, so
     // resizing them by hand is meaningless; show just the selection outline, no handles.
-    if(getComputedStyle(sel).position!=='absolute'){ hideHandles(); return; }
+    if(!isFreeEl(sel)){ hideHandles(); return; }
     ensureHandles(); var r=sel.getBoundingClientRect();
     var pts={ nw:[r.left,r.top], n:[r.left+r.width/2,r.top], ne:[r.right,r.top], e:[r.right,r.top+r.height/2], se:[r.right,r.bottom], s:[r.left+r.width/2,r.bottom], sw:[r.left,r.bottom], w:[r.left,r.top+r.height/2] };
     HK.forEach(function(k){ var pt=pts[k]; handleDivs[k].style.left=(pt[0]-5)+'px'; handleDivs[k].style.top=(pt[1]-5)+'px'; });
