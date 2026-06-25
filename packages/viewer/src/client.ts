@@ -805,6 +805,10 @@ export const CLIENT_JS = `
   }
   function positionHandles(){
     if(!sel||sel.tagName==='SECTION'){ hideHandles(); return; }
+    // Resize handles are only for FREE (framed, position:absolute) elements. Flow elements — bars,
+    // their atoms, an image inside a bar, container children — are laid out by their parent, so
+    // resizing them by hand is meaningless; show just the selection outline, no handles.
+    if(getComputedStyle(sel).position!=='absolute'){ hideHandles(); return; }
     ensureHandles(); var r=sel.getBoundingClientRect();
     var pts={ nw:[r.left,r.top], n:[r.left+r.width/2,r.top], ne:[r.right,r.top], e:[r.right,r.top+r.height/2], se:[r.right,r.bottom], s:[r.left+r.width/2,r.bottom], sw:[r.left,r.bottom], w:[r.left,r.top+r.height/2] };
     HK.forEach(function(k){ var pt=pts[k]; handleDivs[k].style.left=(pt[0]-5)+'px'; handleDivs[k].style.top=(pt[1]-5)+'px'; });
