@@ -87,9 +87,15 @@ export const CHROME_CSS = `
 .dc-dseg.h{ height:2px; } .dc-dseg.v{ width:2px; }
 .dc-dcap{ position:fixed; background:#ff2d6e; }
 .dc-dlbl{ position:fixed; transform:translate(-50%,-50%); background:#ff2d6e; color:#fff; font:10px/1 -apple-system,Segoe UI,sans-serif; padding:2px 5px; border-radius:4px; white-space:nowrap; }
-#dc-handles{ position:fixed; left:0; top:0; pointer-events:none; z-index:38; display:none; }
-#dc-handles.on{ display:block; }
-.dc-h{ position:fixed; width:10px; height:10px; background:#fff; border:1.5px solid #4a6cf7; border-radius:2px; pointer-events:auto; }
+/* Resize handles live INSIDE the slide section (content layer), positioned in slide coordinates,
+   so they scale/scroll/pinch-zoom together with the element and can never drift off it. Sizes are
+   divided by the section's scale (--dcsc) so they stay a constant ~11px on screen. */
+.dc-handles{ position:absolute; pointer-events:none; z-index:38; display:none; }
+.dc-handles.on{ display:block; }
+.dc-h{ position:absolute; width:calc(11px / var(--dcsc,1)); height:calc(11px / var(--dcsc,1)); background:#fff; border:calc(1.5px / var(--dcsc,1)) solid #4a6cf7; border-radius:calc(2px / var(--dcsc,1)); pointer-events:auto; transform:translate(-50%,-50%); box-sizing:border-box; }
+.dc-h.nw{ left:0; top:0; cursor:nwse-resize; } .dc-h.n{ left:50%; top:0; cursor:ns-resize; } .dc-h.ne{ left:100%; top:0; cursor:nesw-resize; }
+.dc-h.e{ left:100%; top:50%; cursor:ew-resize; } .dc-h.se{ left:100%; top:100%; cursor:nwse-resize; } .dc-h.s{ left:50%; top:100%; cursor:ns-resize; }
+.dc-h.sw{ left:0; top:100%; cursor:nesw-resize; } .dc-h.w{ left:0; top:50%; cursor:ew-resize; }
 .dc-h.nw,.dc-h.se{ cursor:nwse-resize; }
 .dc-h.ne,.dc-h.sw{ cursor:nesw-resize; }
 .dc-h.n,.dc-h.s{ cursor:ns-resize; }
@@ -169,7 +175,7 @@ export const CLIENT_JS = `
     var sc=Math.min((stage.clientWidth-64)/1280, 0.95); if(sc<0.1) sc=0.1;
     for(var i=0;i<frames.length;i++){
       frames[i].style.width=(1280*sc)+'px'; frames[i].style.height=(720*sc)+'px';
-      var sec=frames[i].querySelector('section'); if(sec) sec.style.transform='scale('+sc+')';
+      var sec=frames[i].querySelector('section'); if(sec){ sec.style.transform='scale('+sc+')'; sec.style.setProperty('--dcsc',sc); }
     }
     fitThumbs();
   }
@@ -870,26 +876,30 @@ export const CLIENT_JS = `
   var resizing=false, rsc=1, startFrame=null, resizeHandle=null, resizeStart=null, resizeLast=null, resizeFreezeOps=[];
   function ensureHandles(){
     if(handlesEl) return;
-    handlesEl=document.createElement('div'); handlesEl.id='dc-handles'; document.body.appendChild(handlesEl);
+    handlesEl=document.createElement('div'); handlesEl.className='dc-handles';
     HK.forEach(function(k){ var d=document.createElement('div'); d.className='dc-h '+k; handleDivs[k]=d; handlesEl.appendChild(d);
       d.addEventListener('mousedown',function(e){ e.stopPropagation(); e.preventDefault(); startResize(k,e); });
     });
   }
   function positionHandles(){
     if(!sel||sel.tagName==='SECTION'){ hideHandles(); return; }
-    if(isPinched()){ hideHandles(); return; } // fixed overlays can't be aligned under pinch-zoom
     // While you're INSIDE a group (editing its parts), don't show its resize handles — that's
     // clutter over the atoms. Esc out of the group to resize it.
     if(enteredCid&&sel.getAttribute('data-cid')===enteredCid){ hideHandles(); return; }
     // Show the resize frame for any object that can carry a slide-level frame (free elements and
     // promotable flow text/bullets/images) — not chart internals or nested-in-positioned boxes.
     if(!canResize(sel)){ hideHandles(); return; }
-    ensureHandles(); var r=sel.getBoundingClientRect();
-    var pts={ nw:[r.left,r.top], n:[r.left+r.width/2,r.top], ne:[r.right,r.top], e:[r.right,r.top+r.height/2], se:[r.right,r.bottom], s:[r.left+r.width/2,r.bottom], sw:[r.left,r.bottom], w:[r.left,r.top+r.height/2] };
-    HK.forEach(function(k){ var pt=pts[k]; handleDivs[k].style.left=(pt[0]-5)+'px'; handleDivs[k].style.top=(pt[1]-5)+'px'; });
+    ensureHandles();
+    // Mount the handle layer INSIDE the element's slide section and box it in slide coordinates
+    // (offsetLeft/Top/Width/Height are relative to the section, since canResize guarantees the
+    // offsetParent is the section). It then scales/scrolls/pinch-zooms with the content — never
+    // a separate fixed overlay that can drift off the element.
+    var section=sel.closest('section'); if(!section){ hideHandles(); return; }
+    if(handlesEl.parentElement!==section) section.appendChild(handlesEl);
+    handlesEl.style.left=sel.offsetLeft+'px'; handlesEl.style.top=sel.offsetTop+'px'; handlesEl.style.width=sel.offsetWidth+'px'; handlesEl.style.height=sel.offsetHeight+'px';
     handlesEl.classList.add('on');
   }
-  function hideHandles(){ if(handlesEl) handlesEl.classList.remove('on'); }
+  function hideHandles(){ if(handlesEl){ handlesEl.classList.remove('on'); if(handlesEl.parentElement) handlesEl.parentElement.removeChild(handlesEl); } }
   function startResize(k,e){
     if(!sel) return;
     resizing=true; dragged=true; resizeHandle=k; document.body.style.userSelect='none';
