@@ -510,6 +510,11 @@ export const CLIENT_JS = `
   // stale (the famous "blue box flies up on zoom"). Clear the hover boxes and re-place handles.
   window.addEventListener('resize',function(){ fitAll(); updateCurrent(); hideBox(); hideWordHover(); positionHandles(); });
   stage.addEventListener('scroll',function(){ updateCurrent(); hideBox(); positionHandles(); });
+  // Trackpad PINCH-zoom moves the VISUAL viewport without firing window resize or stage scroll,
+  // so fixed-position overlays (the hover box, the resize handles) go stale — the "blue box flies
+  // off" again, this time on pinch. The visualViewport API is the only thing that reports pinch;
+  // clear the hover box and re-place the handles on its resize/scroll, mirroring the handlers above.
+  if(window.visualViewport){ var onPinch=function(){ hideBox(); hideWordHover(); positionHandles(); }; window.visualViewport.addEventListener('resize',onPinch); window.visualViewport.addEventListener('scroll',onPinch); }
   // Slides panel: click to jump, "+ New slide", and drag-to-reorder.
   var thumbWrap=document.getElementById('dc-thumbs');
   function wireThumb(tb){ tb.onclick=function(){ var i=thumbs.indexOf(tb); if(i>=0) goTo(i); }; }
