@@ -41,3 +41,45 @@ export async function generateImage(
   }
   throw new Error("openai images: no image in response");
 }
+
+/**
+ * Tier-2 perception: the ONE genuinely non-measurable check. "Is this actually a giraffe" can't
+ * be computed, so ask a vision model to confirm the generated picture matches the prompt. Fails
+ * OPEN (a flaky vision call never blocks the edit) and is only used to surface an honest note.
+ */
+export async function verifyImage(
+  png: Buffer,
+  prompt: string,
+  anthropicKey: string,
+  model = "claude-haiku-4-5",
+): Promise<{ matches: boolean; sees: string }> {
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": anthropicKey, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model,
+        max_tokens: 120,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: "image/png", data: png.toString("base64") } },
+              {
+                type: "text",
+                text: `Is the MAIN SUBJECT of this request clearly present in the image: "${prompt}"? Judge ONLY the subject — ignore background, scenery, setting and style (the image is intentionally an isolated cut-out on a transparent/blank background). Set matches:false ONLY if the subject is absent or is the WRONG thing. Reply ONLY with JSON {"matches": true|false, "sees": "<3-6 word description of the subject shown>"}.`,
+              },
+            ],
+          },
+        ],
+      }),
+    });
+    if (!res.ok) return { matches: true, sees: "" };
+    const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+    const text = (data.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join(" ");
+    const j = JSON.parse(/\{[\s\S]*\}/.exec(text)?.[0] ?? "{}") as { matches?: boolean; sees?: string };
+    return { matches: j.matches !== false, sees: j.sees ?? "" };
+  } catch {
+    return { matches: true, sees: "" };
+  }
+}

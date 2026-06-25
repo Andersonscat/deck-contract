@@ -7,7 +7,7 @@ import { compileSlides } from "@deck/compile";
 import { apply, parseOps, cloneWithNewIds, buildIndex, type Op } from "@deck/core";
 import { CHROME_CSS, CLIENT_JS } from "./client.js";
 import { runChat } from "./chat.js";
-import { generateImage } from "./imagegen.js";
+import { generateImage, verifyImage } from "./imagegen.js";
 import { LocalChromiumRenderer, type Observation } from "@deck/renderer";
 
 /**
@@ -235,8 +235,9 @@ export function createViewerServer(opts: ViewerOptions) {
     currentSlideId?: string,
     selBox?: unknown,
     selId?: string,
-  ): Promise<unknown[]> => {
+  ): Promise<{ ops: unknown[]; notes: string[] }> => {
     const out: unknown[] = [];
+    const notes: string[] = [];
     const idx = buildIndex(deck);
     for (const raw of ops) {
       const op = raw as { op?: string; prompt?: string; target?: string; mode?: string; parentId?: string; index?: number; frame?: unknown };
@@ -245,6 +246,11 @@ export function createViewerServer(opts: ViewerOptions) {
         const prompt = String(op.prompt ?? "").trim();
         if (!prompt) continue;
         const buf = await generateImage(prompt, openaiKey);
+        // Tier-2 perceptual check: confirm the picture is actually what was asked for (fail-open).
+        if (apiKey) {
+          const v = await verifyImage(buf, prompt, apiKey);
+          if (!v.matches) notes.push(`heads up: the generated image may not match "${prompt}"${v.sees ? ` — it looks like ${v.sees}` : ""}.`);
+        }
         const src = await saveAsset(buf);
         const newId = "img_" + Date.now().toString(36) + "_" + Math.floor(Math.random() * 1e7).toString(36);
         // For a replace, TRUST the user's actual selection over the AI's guessed target (haiku
@@ -295,7 +301,7 @@ export function createViewerServer(opts: ViewerOptions) {
         }
       } else out.push(raw);
     }
-    return out;
+    return { ops: out, notes };
   };
 
   async function buildPage(): Promise<string> {
@@ -550,7 +556,7 @@ export function createViewerServer(opts: ViewerOptions) {
             useOps = [...v0.valid, ...validateOps(deck, retry.ops).valid];
           }
 
-          const expanded = await expandGenOps(useOps, deck, currentSlideId, selBox, selectedId);
+          const { ops: expanded, notes: genNotes } = await expandGenOps(useOps, deck, currentSlideId, selBox, selectedId);
           let applied = 0;
           if (expanded.length) {
             await commit(expanded);
@@ -560,7 +566,7 @@ export function createViewerServer(opts: ViewerOptions) {
           // Readability loop: the user asked for legible text, so MEASURE it and keep correcting
           // until the renderer says it's legible (or the budget runs out). The threshold comes
           // from the user's intent ("visible"), not a system rule — black-on-black isn't verified.
-          let finalReply = reply;
+          let finalReply = genNotes.length ? reply + " " + genNotes.join(" ") : reply;
           if (verify === "readability") {
             const palette = (await readDeck()).theme.color as Record<string, string>;
             const tokenList = Object.entries(palette).map(([k, v]) => `${k} (${v})`).join(", ");
@@ -573,7 +579,7 @@ export function createViewerServer(opts: ViewerOptions) {
                 "Nodes — id : current text colour on background, contrast:\n" +
                 low.map((o) => `${o.nodeId} : ${o.fg} on ${o.bg}, contrast ${o.contrast}`).join("\n");
               const fix = await runChat(fixMsg, await readDeck(), null, apiKey, currentSlideId, undefined, false);
-              const fixOps = await expandGenOps(fix.ops, await readDeck(), currentSlideId);
+              const fixOps = (await expandGenOps(fix.ops, await readDeck(), currentSlideId)).ops;
               if (!fixOps.length) break;
               await commit(fixOps);
               applied += fixOps.length;
