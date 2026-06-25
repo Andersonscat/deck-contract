@@ -71,6 +71,10 @@ export const CHROME_CSS = `
 #dc-stage [data-cid]{ cursor:grab; }
 #dc-stage section[data-cid]{ cursor:default; }
 .dc-selected{ outline:2px solid #ec5a13 !important; outline-offset:-2px; }
+/* Hover highlight is an outline ON the element (like selection) — NOT a fixed overlay positioned
+   from getBoundingClientRect. That makes it immune to trackpad pinch-zoom / scroll / resize: it
+   lives in the content layer and transforms with it, so it can never drift off the element. */
+.dc-hovbox{ outline:2px solid rgba(74,108,247,.7) !important; outline-offset:-2px; }
 #dc-hover{ position:fixed; pointer-events:none; z-index:35; display:none; border:2px solid rgba(74,108,247,.55); border-radius:3px; }
 #dc-hover.drop{ border-color:#ec5a13; background:rgba(236,90,19,.08); }
 #dc-coord{ position:fixed; pointer-events:none; z-index:60; display:none; background:#1c1f26; color:#fff; font:12px/1 -apple-system,Segoe UI,sans-serif; padding:8px 12px; border-radius:9px; white-space:nowrap; transform:translateX(-50%); }
@@ -684,8 +688,11 @@ export const CLIENT_JS = `
   // getBoundingClientRect can't be reconciled with that reliably, so while pinched we simply don't
   // draw fixed overlays (hover box, resize handles) — the on-element selection outline still shows.
   function isPinched(){ var v=window.visualViewport; return !!v && (Math.abs(v.scale-1)>0.01 || v.offsetLeft>1 || v.offsetTop>1); }
-  function showBox(el){ if(!el||isPinched()){ hideBox(); return; } var r=el.getBoundingClientRect(); if(r.width<1&&r.height<1){ hideBox(); return; } var h=hbox(); h.className=''; h.style.display='block'; h.style.left=r.left+'px'; h.style.top=r.top+'px'; h.style.width=r.width+'px'; h.style.height=r.height+'px'; }
-  function hideBox(){ if(dragHover) dragHover.style.display='none'; }
+  // The hover highlight is now a class on the element itself (see .dc-hovbox), so it stays put
+  // under pinch-zoom. We just track which element currently wears it.
+  var hoverEl=null;
+  function showBox(el){ if(el===hoverEl) return; if(hoverEl) hoverEl.classList.remove('dc-hovbox'); hoverEl=null; if(!el||el.tagName==='SECTION'||el.classList.contains('dc-selected')) return; el.classList.add('dc-hovbox'); hoverEl=el; }
+  function hideBox(){ if(hoverEl){ hoverEl.classList.remove('dc-hovbox'); hoverEl=null; } if(dragHover) dragHover.style.display='none'; }
   function round3(n){ return Math.round(n*1000)/1000; }
   var NO_HOVER={'two-column':1,'container':1,'slide':1};
   stage.addEventListener('mousemove',function(e){ if(dragging) return;
