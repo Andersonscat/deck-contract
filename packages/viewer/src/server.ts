@@ -70,6 +70,44 @@ function body(req: IncomingMessage): Promise<string> {
   });
 }
 
+// Ancestor path to a node id (root slide ... node), for working out where a flow element sits.
+function pathTo(deck: Deck, id: string): DeckNode[] | null {
+  const walk = (node: DeckNode, acc: DeckNode[]): DeckNode[] | null => {
+    acc.push(node);
+    if (node.id === id) return acc;
+    for (const c of node.children ?? []) {
+      const r = walk(c, acc);
+      if (r) return r;
+    }
+    acc.pop();
+    return null;
+  };
+  for (const s of deck.slides) {
+    const p = walk(s, []);
+    if (p) return p;
+  }
+  return null;
+}
+
+// If `id` is (inside) a bar of a framed bar-chart, the on-slide box of that bar's column —
+// so replacing a bar with an image can land roughly where the bar was, even with no selection.
+function barColumnBox(deck: Deck, id: string): { x: number; y: number; w: number; h: number } | undefined {
+  const path = pathTo(deck, id);
+  if (!path) return undefined;
+  let chart: DeckNode | undefined, chartIdx = -1;
+  for (let i = path.length - 1; i >= 0; i--) {
+    if (path[i]!.type === "bar-chart" && path[i]!.frame) { chart = path[i]; chartIdx = i; break; }
+  }
+  if (!chart || !chart.frame) return undefined;
+  const bars = (chart.children ?? []).filter((c) => c.type === "bar");
+  const barNode = path[chartIdx + 1];
+  const idx = bars.findIndex((b) => b.id === barNode?.id);
+  if (idx < 0 || bars.length === 0) return undefined;
+  const f = chart.frame;
+  const cw = (f.w ?? 100) / bars.length;
+  return { x: (f.x ?? 0) + idx * cw, y: f.y ?? 0, w: cw, h: f.h ?? 40 };
+}
+
 export function createViewerServer(opts: ViewerOptions) {
   const port = opts.port ?? 4570;
   const apiKey = opts.apiKey ?? process.env.ANTHROPIC_API_KEY;
@@ -146,13 +184,20 @@ export function createViewerServer(opts: ViewerOptions) {
           repEntry = undefined;
           repId = undefined;
         }
-        // Prefer the on-screen box of the thing being replaced, so the image lands where it was.
-        const replacedBox = repId && repId === selId ? selBox : undefined;
+        // Replacing a whole bar would drop its column and reflow the chart (the image then lands
+        // on a shifted neighbour). Swap only the fill so the column slot — and the layout — stay put.
+        if (repEntry && repEntry.node.type === "bar") {
+          const fill = (repEntry.node.children ?? []).find((c) => c.type === "bar-fill");
+          if (fill) { repId = fill.id; repEntry = idx.get(fill.id); }
+        }
+        // Where to put it: the user's pointed-at box (selBox) if they had a selection; else, for a
+        // bar, the computed column box; else the node's own frame; else a default.
+        const replacedBox = repId ? (selBox as object) ?? barColumnBox(deck, repId) : undefined;
         const rawFrame = (op.frame as object) ?? replacedBox ?? repEntry?.node.frame ?? { x: 34, y: 28, w: 32, h: 40 };
         // A thin element (e.g. a bar) would crush a contained image to a sliver; grow the box to a
         // visible minimum, centered on where the element was, clamped to the slide.
         const ensureVisible = (f: { x?: number; y?: number; w?: number; h?: number }) => {
-          const minW = 20, minH = 26;
+          const minW = 14, minH = 22;
           let x = f.x ?? 30, y = f.y ?? 26, w = f.w ?? minW, h = f.h ?? minH;
           if (w < minW) { x += w / 2 - minW / 2; w = minW; }
           if (h < minH) { y += h / 2 - minH / 2; h = minH; }
