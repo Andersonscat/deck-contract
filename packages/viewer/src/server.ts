@@ -8,6 +8,7 @@ import { apply, parseOps, cloneWithNewIds, buildIndex, type Op } from "@deck/cor
 import { CHROME_CSS, CLIENT_JS } from "./client.js";
 import { runChat } from "./chat.js";
 import { generateImage } from "./imagegen.js";
+import { LocalChromiumRenderer, type Observation } from "@deck/renderer";
 
 /**
  * Local Canva-style editor: left rail/panels, center slide canvas, right AI chat.
@@ -70,6 +71,32 @@ function body(req: IncomingMessage): Promise<string> {
   });
 }
 
+// WCAG contrast helpers (server-side mirror of the renderer's, for the deterministic fallback).
+function hexToRgb(h: string): { r: number; g: number; b: number } {
+  let s = h.replace("#", "");
+  if (s.length === 3) s = s.split("").map((c) => c + c).join("");
+  return { r: parseInt(s.slice(0, 2), 16), g: parseInt(s.slice(2, 4), 16), b: parseInt(s.slice(4, 6), 16) };
+}
+function relLum({ r, g, b }: { r: number; g: number; b: number }): number {
+  const f = (v: number) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+function contrastHex(a: string, b: string): number {
+  const L1 = relLum(hexToRgb(a)), L2 = relLum(hexToRgb(b));
+  const hi = Math.max(L1, L2), lo = Math.min(L1, L2);
+  return (hi + 0.05) / (lo + 0.05);
+}
+/** The palette token whose colour contrasts MOST with a given background hex. */
+function bestContrastToken(colors: Record<string, string>, bgHex: string): { token: string; contrast: number } | null {
+  let best: string | null = null, bc = 0;
+  for (const [k, v] of Object.entries(colors)) {
+    if (!/^#[0-9a-fA-F]{3,6}$/.test(v)) continue;
+    const c = contrastHex(v, bgHex);
+    if (c > bc) { bc = c; best = k; }
+  }
+  return best ? { token: best, contrast: bc } : null;
+}
+
 // Ancestor path to a node id (root slide ... node), for working out where a flow element sits.
 function pathTo(deck: Deck, id: string): DeckNode[] | null {
   const walk = (node: DeckNode, acc: DeckNode[]): DeckNode[] | null => {
@@ -113,6 +140,17 @@ export function createViewerServer(opts: ViewerOptions) {
   const apiKey = opts.apiKey ?? process.env.ANTHROPIC_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
   const clients = new Set<ServerResponse>();
+
+  // A warm headless renderer, started lazily — only readability-verified chats need it. It is the
+  // perception oracle: it returns the MEASURED contrast a "done" claim must be backed by.
+  let rendererP: Promise<LocalChromiumRenderer> | undefined;
+  const renderer = () => (rendererP ??= Promise.resolve(new LocalChromiumRenderer()));
+  const READABLE_MIN = 4.5; // the user's "make it visible" maps to the standard legibility target
+
+  const lowContrastOnSlide = async (slideId?: string): Promise<Observation[]> => {
+    const { observations } = await (await renderer()).render(await readDeck());
+    return observations.filter((o) => (!slideId || o.slideId === slideId) && o.contrast < READABLE_MIN);
+  };
 
   // Generated images are cached next to the deck and served from /assets, so the deck just
   // stores a stable local src (compile stays pure).
@@ -462,15 +500,63 @@ export function createViewerServer(opts: ViewerOptions) {
         try {
           const deck = await readDeck();
           const selection = selectedId ? { nodeId: selectedId } : await readSelection();
-          const { reply, ops } = await runChat(message, deck, selection, apiKey, currentSlideId, undefined, !!openaiKey);
+          const { reply, ops, verify } = await runChat(message, deck, selection, apiKey, currentSlideId, undefined, !!openaiKey);
           const expanded = await expandGenOps(ops, deck, currentSlideId, selBox, selectedId);
           let applied = 0;
           if (expanded.length) {
             await commit(expanded);
             applied = expanded.length;
           }
+
+          // Readability loop: the user asked for legible text, so MEASURE it and keep correcting
+          // until the renderer says it's legible (or the budget runs out). The threshold comes
+          // from the user's intent ("visible"), not a system rule — black-on-black isn't verified.
+          let finalReply = reply;
+          if (verify === "readability") {
+            const palette = (await readDeck()).theme.color as Record<string, string>;
+            const tokenList = Object.entries(palette).map(([k, v]) => `${k} (${v})`).join(", ");
+            for (let pass = 0; pass < 2; pass++) {
+              const low = await lowContrastOnSlide(currentSlideId);
+              if (!low.length) break;
+              const fixMsg =
+                "Some text on this slide is still hard to read against its background. Recolor ONLY these nodes to a token whose colour clearly CONTRASTS with the listed background so each becomes legible (use set_token or set_token_where). A light background needs a dark token and vice-versa.\n" +
+                "Available colour tokens and their hex: " + tokenList + "\n" +
+                "Nodes — id : current text colour on background, contrast:\n" +
+                low.map((o) => `${o.nodeId} : ${o.fg} on ${o.bg}, contrast ${o.contrast}`).join("\n");
+              const fix = await runChat(fixMsg, await readDeck(), null, apiKey, currentSlideId, undefined, false);
+              const fixOps = await expandGenOps(fix.ops, await readDeck(), currentSlideId);
+              if (!fixOps.length) break;
+              await commit(fixOps);
+              applied += fixOps.length;
+            }
+            // Deterministic last resort: the user explicitly asked for legible text, so if the model
+            // still hasn't reached it, pick the highest-contrast palette token per node (token-only
+            // preserved). This fulfils the stated goal; it is not a system style opinion.
+            const stuck = await lowContrastOnSlide(currentSlideId);
+            if (stuck.length) {
+              const fixOps = stuck
+                .map((o) => {
+                  const best = bestContrastToken(palette, o.bg);
+                  return best ? { op: "set_token" as const, nodeId: o.nodeId, prop: "color", value: `token://color/${best.token}` } : null;
+                })
+                .filter(Boolean) as unknown[];
+              if (fixOps.length) {
+                await commit(fixOps);
+                applied += fixOps.length;
+              }
+            }
+            const residual = await lowContrastOnSlide(currentSlideId);
+            if (residual.length) {
+              finalReply =
+                reply +
+                ` (Note: ${residual.length} text element${residual.length > 1 ? "s" : ""} still measure below the legibility target: ${residual
+                  .map((o) => o.nodeId)
+                  .join(", ")}. I couldn't make ${residual.length > 1 ? "them" : "it"} legible automatically.)`;
+            }
+          }
+
           const { slides } = compileSlides(await readDeck());
-          return json({ reply, applied, ...hist(), slides });
+          return json({ reply: finalReply, applied, ...hist(), slides });
         } catch (e) {
           return json({ reply: "error: " + (e instanceof Error ? e.message : String(e)), applied: 0 });
         }

@@ -8,6 +8,7 @@
   "dependencies": {
     "@deck/compile": "workspace:*",
     "@deck/contract": "workspace:*",
-    "@deck/core": "workspace:*"
+    "@deck/core": "workspace:*",
+    "@deck/renderer": "workspace:*"
   }
 }

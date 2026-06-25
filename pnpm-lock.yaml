@@ -140,6 +140,9 @@ importers:
       '@deck/core':
         specifier: workspace:*
         version: link:../core
+      '@deck/renderer':
+        specifier: workspace:*
+        version: link:../renderer
 
 packages:
 

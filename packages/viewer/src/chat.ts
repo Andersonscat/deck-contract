@@ -9,6 +9,8 @@ import type { Deck, DeckNode } from "@deck/contract";
 export interface ChatResult {
   reply: string;
   ops: unknown[];
+  /** What the harness should verify against the user's intent after applying the ops. */
+  verify: "none" | "readability";
 }
 
 function preview(node: DeckNode): string {
@@ -58,6 +60,7 @@ export async function runChat(
     '- {"op":"set_text","nodeId":ID,"value":STRING}   (only a node\'s .text — titles/headings)',
     '- {"op":"set_content","nodeId":ID,"content":{...}}   (replace content fields: text | items[] | value,label,delta | src,alt,caption)',
     '- {"op":"set_token","nodeId":ID,"prop":"color"|"size"|"font"|...,"value":"token://ns/name"}   (styles the WHOLE node)',
+    '- {"op":"set_token_where","selector":{"hasText":true,"slideId":SLIDE?,"types":[...]?},"prop":"color","value":"token://ns/name"}   (BULK: style EVERY node matching the selector at once — use this for "all text", "every title", etc. The harness enumerates the nodes; you only pick the token. Prefer this over many set_token ops when the user says all/every.)',
     '- {"op":"format_range","nodeId":ID,"target":{"match":"word"}|{"from":N,"to":M},"prop":"color"|"font"|"size","value":"token://ns/name"}   (style ONE word/phrase/letter INSIDE a text)',
     '- {"op":"clear_range","nodeId":ID,"target":{"match":"word"}|{"from":N,"to":M},"prop":"color"|"font"|"size"}   (remove a sub-text style)',
     '- {"op":"insert_node","parentId":ID,"index":N,"node":{...}}',
@@ -81,6 +84,7 @@ export async function runChat(
     "",
     "Rules: style/colors only via set_token / format_range with theme tokens (never raw hex/px). Only edit nodes that exist.",
     "Honesty: if you genuinely cannot do what was asked (it needs a capability you don't have, or the targeted node has no relevant field for it), say so plainly in `reply` and return an EMPTY ops array. NEVER fake it by editing a different node or stuffing the request into a text/label field. Respect the user's selected node.",
+    'Verification: set `verify` to "readability" ONLY when the user explicitly wants text to be visible/legible/readable (e.g. "make the text visible", "сделай текст читаемым"). Then recolor the text to a contrasting token (set_token_where over text nodes is ideal) and the harness will MEASURE the contrast and keep going until it is legible. If the user wants a specific look even if low-contrast (e.g. "black text on black", a deliberate effect), set `verify` to "none" — never override their choice. Default is "none".',
     'To recolour/restyle ONE word, letter, or phrase INSIDE a text (e.g. "make the word build orange"), use format_range with target {match:"build"} — the server finds the character offsets itself; never compute offsets by hand. Use set_token only when the user means the WHOLE text node.',
     "Available theme tokens: " + tokens(deck),
     "All components:\n" + outline(deck),
@@ -104,6 +108,11 @@ export async function runChat(
             description: "A short, friendly message to the user in English. Never include JSON, ops, ids, or code.",
           },
           ops: { type: "array", items: { type: "object" }, description: "The id-addressed ops to apply." },
+          verify: {
+            type: "string",
+            enum: ["none", "readability"],
+            description: "\"readability\" ONLY if the user asked for visible/legible text; else \"none\".",
+          },
         },
         required: ["reply", "ops"],
       },
@@ -124,12 +133,16 @@ export async function runChat(
   });
   if (!res.ok) throw new Error("anthropic " + res.status + ": " + (await res.text()).slice(0, 300));
   const data = (await res.json()) as {
-    content?: Array<{ type: string; name?: string; input?: { reply?: string; ops?: unknown[] } }>;
+    content?: Array<{ type: string; name?: string; input?: { reply?: string; ops?: unknown[]; verify?: string } }>;
   };
   // tool_choice forces a single edit_deck tool call: reply is clean text, ops is structured.
   const tu = (data.content ?? []).find((c) => c.type === "tool_use" && c.name === "edit_deck");
   if (tu && tu.input) {
-    return { reply: tu.input.reply ?? "Done.", ops: Array.isArray(tu.input.ops) ? tu.input.ops : [] };
+    return {
+      reply: tu.input.reply ?? "Done.",
+      ops: Array.isArray(tu.input.ops) ? tu.input.ops : [],
+      verify: tu.input.verify === "readability" ? "readability" : "none",
+    };
   }
-  return { reply: "Sorry, I couldn't process that. Try rephrasing.", ops: [] };
+  return { reply: "Sorry, I couldn't process that. Try rephrasing.", ops: [], verify: "none" };
 }
