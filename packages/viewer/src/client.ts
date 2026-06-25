@@ -358,7 +358,7 @@ export const CLIENT_JS = `
 
   function select(el,opts){
     var noTab=opts&&opts.noTab;
-    clearSel(); el.classList.add('dc-selected'); sel=el;
+    clearSel(); hideBox(); el.classList.add('dc-selected'); sel=el; // clear any stale hover box on select
     var cid=el.getAttribute('data-cid'); var type=el.getAttribute('data-type');
     if(el.tagName==='SECTION'){ var fr=el.closest('.dc-frame'); if(fr) fr.classList.add('dc-frame-sel'); } // slide selected -> highlight the whole frame
     setHead(el.tagName==='SECTION'?'AI · selected: slide':'AI · selected: '+type);
@@ -816,6 +816,9 @@ export const CLIENT_JS = `
   }
   function positionHandles(){
     if(!sel||sel.tagName==='SECTION'){ hideHandles(); return; }
+    // While you're INSIDE a group (editing its parts), don't show its resize handles — that's
+    // clutter over the atoms. Esc out of the group to resize it.
+    if(enteredCid&&sel.getAttribute('data-cid')===enteredCid){ hideHandles(); return; }
     // Resize handles are only for FREE (framed, position:absolute) elements. Flow elements — bars,
     // their atoms, an image inside a bar, container children — are laid out by their parent, so
     // resizing them by hand is meaningless; show just the selection outline, no handles.
