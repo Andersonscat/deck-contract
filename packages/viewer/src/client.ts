@@ -714,7 +714,13 @@ export const CLIENT_JS = `
   // A framed element NESTED in another framed one (e.g. an image inside a bar-chart) has its
   // parent as offsetParent, so the slide-relative drag/resize math doesn't apply — it is
   // structural (positioned by its container), not freely movable.
-  function isFreeEl(el){ if(!el||el.tagName==='SECTION') return false; if(getComputedStyle(el).position!=='absolute') return false; var p=el.parentElement?el.parentElement.closest('#dc-stage [data-cid]'):null; return !p||p.tagName==='SECTION'; }
+  // An absolutely-positioned element is "free" (slide-relative drag/resize math holds) when its
+  // frame resolves against the SLIDE — i.e. its offsetParent is the section. This is true for free
+  // slide-children AND for flow elements promoted to a frame inside a STATIC container (the
+  // container isn't a positioning context). It's false only for elements nested in another
+  // positioned box (an image inside the chart), where the math would be wrong. Using offsetParent
+  // (not the DOM parent) is what lets a promoted-in-container element keep being draggable.
+  function isFreeEl(el){ if(!el||el.tagName==='SECTION') return false; if(getComputedStyle(el).position!=='absolute') return false; return !!el.offsetParent && el.offsetParent.tagName==='SECTION'; }
   // Which selected objects get the standard 8-handle resize frame. Broader than isFreeEl: a FLOW
   // element (text, bullet-list, image in a column) is resizable too — startResize freezes the
   // slide and promotes it to a slide-level frame. The gate is that an absolute frame on it would
@@ -722,7 +728,16 @@ export const CLIENT_JS = `
   // and for flow elements in static containers, but NOT for chart internals or anything nested in
   // another positioned box (an image inside the chart), where slide-relative resize math is wrong.
   function canResize(el){ if(!el||el.tagName==='SECTION') return false; var t=el.getAttribute('data-type'); if(t==='bar'||t==='bar-fill'||t==='bar-value'||t==='bar-label') return false; return !!el.offsetParent && el.offsetParent.tagName==='SECTION'; }
-  stage.addEventListener('mousedown',function(e){ var el=e.target.closest('#dc-stage [data-cid]'); if(!el||el.tagName==='SECTION') return; var t=selectTarget(el); if(getComputedStyle(t).position==='absolute' && !isFreeEl(t)) return; candEl=t; downPt={x:e.clientX,y:e.clientY}; dragged=false; });
+  stage.addEventListener('mousedown',function(e){
+    if(enteredText&&enteredText.contains(e.target)) return; // editing this text: let the caret/selection work
+    var el=e.target.closest('#dc-stage [data-cid]'); if(!el||el.tagName==='SECTION') return;
+    var t=selectTarget(el); if(getComputedStyle(t).position==='absolute' && !isFreeEl(t)) return;
+    candEl=t; downPt={x:e.clientX,y:e.clientY}; dragged=false;
+    // Suppress the browser's native text-selection / image-drag so a press-drag on a TEXT element
+    // MOVES the element instead of selecting its characters (that selection was silently winning
+    // the gesture, so text/table elements felt undraggable). Click=select and dblclick=edit still fire.
+    e.preventDefault();
+  });
   document.addEventListener('mousemove',function(e){
     if(resizing){ doResize(e); return; }
     if(dragging){ var s=snapDrag(e); dragLast=s; applyDragVisual(s); return; }
