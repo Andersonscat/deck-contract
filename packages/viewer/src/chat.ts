@@ -76,8 +76,6 @@ export async function runChat(
     "- title (role slide-title/title): the slide headline. Words: заголовок, название, title, headline. Edit: set_text.",
     "- heading (role subtitle): a sub-heading. Words: подзаголовок, subtitle. Edit: set_text.",
     "- heading (role heading/quote): secondary heading or quote text. Edit: set_text.",
-    "- bullet-list (role supporting-points): bullet points. Words: список, буллеты, list, points. Edit: set_content { items:[...] }.",
-    "- stat-callout (role key-metric): a big metric. Words: метрика, число, показатель, KPI. Edit: set_content { value, label, delta }.",
     "- image-caption (role visual): image + caption. Words: картинка, изображение, image. Edit: set_content { src, alt, caption }.",
     "- bar-chart (role chart): a CONTAINER whose children are individual `bar` components (one per column), in order. Words: график, диаграмма, chart, bar chart.",
     "- bar (role bar): ONE column of a bar-chart, a CONTAINER decomposed into three atomic children, each individually addressable by id: bar-value (the number on top, content.text), bar-fill (the rectangle — content.barValue height 0..100, style.color the fill), bar-label (the category underneath, content.text). \"the third bar / третий столбец\" = the 3rd `bar` child of the chart, in order; its atoms are that bar's children. To recolour a column: set_token {prop:color} on its bar-fill. To change its height: set_content {barValue} on the bar-fill. To change the number/label: set_content {text} on its bar-value / bar-label. Touch only the atoms you're asked to.",
