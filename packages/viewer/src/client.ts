@@ -646,9 +646,10 @@ export const CLIENT_JS = `
     // highlight only WORDS within THAT node; nothing else lights up. Otherwise: whole objects.
     if(enteredText){ var off=offsetAtPoint(enteredText,e.clientX,e.clientY); var wr=(off>=0)?wordRangeAt(enteredText.textContent||'',off):null; if(wr) showWordHover(enteredText,wr.from,wr.to); else hideWordHover(); hideBox(); return; }
     var el=e.target.closest('#dc-stage [data-cid]'); var tgt=(el&&el.tagName!=='SECTION')?resolveTarget(el):null;
-    // Don't outline layout containers (two-column / container) — their big empty box over the
-    // slide reads as a misplaced frame. Highlight real content/objects only.
-    if(tgt&&!NO_HOVER[tgt.getAttribute('data-type')]) showBox(tgt); else hideBox();
+    // Skip the box for: layout containers (their big empty box reads as a misplaced frame) and
+    // the group you are already INSIDE (hovering its own background shouldn't re-outline the whole
+    // group over its children). Highlight real content/objects only.
+    if(tgt&&!NO_HOVER[tgt.getAttribute('data-type')]&&tgt.getAttribute('data-cid')!==enteredCid) showBox(tgt); else hideBox();
     if(layersOn()) highlightLayer(tgt?tgt.getAttribute('data-cid'):null); });
   stage.addEventListener('mouseleave',function(){ if(!dragging) hideBox(); if(layersOn()) highlightLayer(null); });
   // A "free" element is framed AND positioned by the slide itself (offsetParent = the section).
