@@ -1,7 +1,7 @@
 import { chromium, type Browser } from "playwright";
 import { compileHtml } from "@deck/compile";
 import { IssueCode, type Deck, type Issue } from "@deck/contract";
-import { MEASURE_SOURCE, type RawIssue } from "./measure.js";
+import { MEASURE_SOURCE, OBSERVE_SOURCE, type RawIssue, type Observation } from "./measure.js";
 
 /**
  * LocalChromiumRenderer — the imperative shell around the pure core. It owns the only
@@ -23,6 +23,8 @@ export interface RenderedSlide {
 export interface RenderResult {
   slides: RenderedSlide[];
   issues: Issue[];
+  /** Neutral per-text-node facts (resolved colours + WCAG contrast + bounds). */
+  observations: Observation[];
 }
 
 export interface RenderOptions {
@@ -95,6 +97,8 @@ export class LocalChromiumRenderer {
       // Inject the measurement source verbatim (see measure.ts) — bundler-proof.
       const raw = (await page.evaluate(`(${MEASURE_SOURCE})(${eps})`)) as RawIssue[];
       const issues = raw.map(toIssue);
+      // Neutral perception facts (resolved colours + WCAG contrast) — the un-fakeable signal.
+      const observations = (await page.evaluate(`(${OBSERVE_SOURCE})()`)) as Observation[];
 
       const slides: RenderedSlide[] = [];
       for (const slide of deck.slides) {
@@ -103,7 +107,7 @@ export class LocalChromiumRenderer {
         const png = await el.screenshot({ type: "png" });
         slides.push({ slideId: slide.id, png, width: deck.canvas.width, height: deck.canvas.height });
       }
-      return { slides, issues };
+      return { slides, issues, observations };
     } finally {
       await context.close();
     }

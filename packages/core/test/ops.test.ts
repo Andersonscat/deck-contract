@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseDeck } from "@deck/contract";
-import { apply, buildIndex, collectIds, type Op } from "@deck/core";
+import { apply, buildIndex, collectIds, selectNodes, type Op } from "@deck/core";
 import { makeDeck } from "./_fixture.js";
 
 describe("buildIndex", () => {
@@ -36,6 +36,47 @@ describe("id stability (rewrite-forcing decision #1)", () => {
     // the new node is first; the previously-first node kept its id and moved to index 1
     expect(after.slides[0]!.children![0]!.children![0]!.id).toBe("eyebrow_new");
     expect(after.slides[0]!.children![0]!.children![1]!.id).toBe("title_main");
+  });
+});
+
+describe("set_token_where (bulk apply over a generic selector)", () => {
+  it("selectNodes returns text-bearing nodes, not bare containers", () => {
+    const deck = parseDeck(makeDeck());
+    const ids = selectNodes(deck, { hasText: true }).map((n) => n.id);
+    expect(ids).toContain("title_main");
+    expect(ids).toContain("bullets_main");
+    expect(ids).toContain("metric_rev");
+    expect(ids).not.toContain("col_left"); // a container owns no text of its own
+  });
+
+  it("scopes by type and slideId", () => {
+    const deck = parseDeck(makeDeck());
+    expect(selectNodes(deck, { types: ["title"], slideId: "slide_01" }).map((n) => n.id)).toEqual([
+      "title_main",
+    ]);
+    expect(selectNodes(deck, { slideId: "nope", hasText: true })).toEqual([]);
+    expect(selectNodes(deck, {})).toEqual([]); // empty selector matches nothing (safety)
+  });
+
+  it("fans ONE token choice out to every matching node, and the inverse round-trips exactly", () => {
+    const deck = parseDeck(makeDeck());
+    const before = JSON.stringify(deck);
+    const { deck: after, inverse } = apply(deck, [
+      { op: "set_token_where", selector: { hasText: true }, prop: "color", value: "token://color/accent" },
+    ]);
+    const idx = buildIndex(after);
+    for (const id of ["title_main", "bullets_main", "metric_rev"]) {
+      expect(idx.get(id)!.node.style!.color).toBe("token://color/accent");
+    }
+    const { deck: restored } = apply(after, inverse);
+    expect(JSON.stringify(restored)).toBe(before); // no-op-safe, fully reversible
+  });
+
+  it("rejects a raw (non-token) value (token-only invariant holds for the bulk op)", () => {
+    const deck = parseDeck(makeDeck());
+    expect(() =>
+      apply(deck, [{ op: "set_token_where", selector: { hasText: true }, prop: "color", value: "#fff" }]),
+    ).toThrow(/token/);
   });
 });
 

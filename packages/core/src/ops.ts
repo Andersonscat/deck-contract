@@ -20,6 +20,52 @@ import {
 export type RangeTarget = { from: number; to: number } | { match: string; nth?: number };
 type MarkProp = (typeof MARK_PROPS)[number];
 
+/**
+ * A generic, INTENT-FREE predicate over nodes — the enumeration the bulk op (set_token_where)
+ * runs in deterministic code so a weak model only has to choose the token, never loop over
+ * nodes. It is a selector ("all text-bearing nodes on this slide"), not a per-intent function.
+ */
+export type NodeSelector = {
+  types?: string[];
+  roles?: string[];
+  hasText?: boolean;
+  slideId?: string;
+};
+
+function hasTextContent(n: DeckNode): boolean {
+  const c = n.content;
+  if (!c) return false;
+  if (typeof c.text === "string" && c.text.trim() !== "") return true;
+  if (Array.isArray(c.items) && c.items.length > 0) return true;
+  for (const k of ["value", "label", "caption"] as const) {
+    const v = (c as Record<string, unknown>)[k];
+    if (typeof v === "string" && v.trim() !== "") return true;
+  }
+  return false;
+}
+
+function matchesSelector(n: DeckNode, sel: NodeSelector): boolean {
+  if (sel.types && !sel.types.includes(n.type)) return false;
+  if (sel.roles && (!n.role || !sel.roles.includes(n.role))) return false;
+  if (sel.hasText && !hasTextContent(n)) return false;
+  return true;
+}
+
+/** Every node matching the selector, in document order. Pure. An empty selector matches nothing. */
+export function selectNodes(deck: Deck, sel: NodeSelector): DeckNode[] {
+  const out: DeckNode[] = [];
+  if (!sel.types && !sel.roles && !sel.hasText) return out;
+  const walk = (n: DeckNode) => {
+    if (matchesSelector(n, sel)) out.push(n);
+    for (const c of n.children ?? []) walk(c);
+  };
+  for (const s of deck.slides) {
+    if (sel.slideId && s.id !== sel.slideId) continue;
+    walk(s);
+  }
+  return out;
+}
+
 function resolveRange(text: string, target: RangeTarget, nodeId: string): { from: number; to: number } {
   if ("from" in target) return { from: target.from, to: target.to };
   const occ = target.nth ?? 1;
@@ -47,6 +93,7 @@ export type Op =
   | { op: "set_text"; nodeId: string; value: string }
   | { op: "set_content"; nodeId: string; content: Content }
   | { op: "set_token"; nodeId: string; prop: string; value: string }
+  | { op: "set_token_where"; selector: NodeSelector; prop: string; value: string }
   | { op: "set_align"; nodeId: string; value: "left" | "center" | "right" }
   | { op: "set_frame"; nodeId: string; frame: Frame }
   | { op: "remove_frame"; nodeId: string }
@@ -82,6 +129,23 @@ export const OpSchema: z.ZodType<Op> = z.discriminatedUnion("op", [
       value: z
         .string()
         .regex(TOKEN_REF, "set_token rejected: value must be a token ref (token-only invariant)"),
+    })
+    .strict(),
+  z
+    .object({
+      op: z.literal("set_token_where"),
+      selector: z
+        .object({
+          types: z.array(z.string()).optional(),
+          roles: z.array(z.string()).optional(),
+          hasText: z.boolean().optional(),
+          slideId: z.string().optional(),
+        })
+        .strict(),
+      prop: z.string().min(1),
+      value: z
+        .string()
+        .regex(TOKEN_REF, "set_token_where rejected: value must be a token ref (token-only invariant)"),
     })
     .strict(),
   z.object({ op: z.literal("set_align"), nodeId: idStr, value: z.enum(["left", "center", "right"]) }).strict(),
@@ -291,6 +355,27 @@ export function apply(deck: Deck, ops: Op[]): ApplyResult {
               ? { op: "remove_token", nodeId: op.nodeId, prop: op.prop }
               : { op: "set_token", nodeId: op.nodeId, prop: op.prop, value: old },
           );
+          break;
+        }
+        case "set_token_where": {
+          if (!TOKEN_REF.test(op.value)) {
+            throw new Error(
+              `set_token_where rejected: "${op.value}" is not a token ref (token-only invariant)`,
+            );
+          }
+          // The harness enumerates; one token choice fans out to every matching node, so a weak
+          // model can't "forget" some. Per-node inverse keeps undo exact.
+          const targets = selectNodes(draft as unknown as Deck, op.selector);
+          for (const node of targets) {
+            const old = node.style?.[op.prop];
+            if (!node.style) node.style = {};
+            node.style[op.prop] = op.value;
+            inverse.push(
+              old === undefined
+                ? { op: "remove_token", nodeId: node.id, prop: op.prop }
+                : { op: "set_token", nodeId: node.id, prop: op.prop, value: old },
+            );
+          }
           break;
         }
         case "remove_token": {
