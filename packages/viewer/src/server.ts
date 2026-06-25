@@ -71,6 +71,39 @@ function body(req: IncomingMessage): Promise<string> {
   });
 }
 
+// A token value points at a token that ACTUALLY exists in the theme (not just token-shaped).
+function tokenExists(deck: Deck, value: string): boolean {
+  const m = /^token:\/\/([a-z]+)\/(.+)$/.exec(value);
+  if (!m) return false;
+  const ns = (deck.theme as unknown as Record<string, Record<string, unknown>>)[m[1]!];
+  return !!ns && ns[m[2]!] !== undefined;
+}
+
+/**
+ * Constrained-ops hygiene: reject any op that targets a node id or a theme token that does not
+ * exist BEFORE it touches the deck, so a loosely-formed op can't silently corrupt a sibling.
+ * Returns the clean ops and the rejected ones with reasons (for a single cheap retry).
+ */
+function validateOps(deck: Deck, ops: unknown[]): { valid: unknown[]; invalid: { op: unknown; reason: string }[] } {
+  const idx = buildIndex(deck);
+  const valid: unknown[] = [];
+  const invalid: { op: unknown; reason: string }[] = [];
+  for (const raw of ops) {
+    const op = raw as { op?: string; nodeId?: string; parentId?: string; newParentId?: string; value?: string };
+    if (op.op === "generate_image") { valid.push(raw); continue; } // expanded + checked separately
+    const reasons: string[] = [];
+    for (const t of [op.nodeId, op.parentId, op.newParentId]) {
+      if (t && t !== "@slides" && !idx.has(t)) reasons.push(`node "${t}" does not exist`);
+    }
+    if (typeof op.value === "string" && op.value.startsWith("token://") && !tokenExists(deck, op.value)) {
+      reasons.push(`token "${op.value}" is not in the theme`);
+    }
+    if (reasons.length) invalid.push({ op: raw, reason: reasons.join("; ") });
+    else valid.push(raw);
+  }
+  return { valid, invalid };
+}
+
 // WCAG contrast helpers (server-side mirror of the renderer's, for the deterministic fallback).
 function hexToRgb(h: string): { r: number; g: number; b: number } {
   let s = h.replace("#", "");
@@ -501,7 +534,23 @@ export function createViewerServer(opts: ViewerOptions) {
           const deck = await readDeck();
           const selection = selectedId ? { nodeId: selectedId } : await readSelection();
           const { reply, ops, verify } = await runChat(message, deck, selection, apiKey, currentSlideId, undefined, !!openaiKey);
-          const expanded = await expandGenOps(ops, deck, currentSlideId, selBox, selectedId);
+
+          // Constrained-ops hygiene: drop edits that target a non-existent id/token, with ONE cheap
+          // retry feeding the rejections back — so a mis-aimed op can't corrupt a sibling.
+          let useOps = ops;
+          const v0 = validateOps(deck, ops);
+          if (v0.invalid.length) {
+            const errMsg =
+              "Some of your edits were REJECTED because they referenced things that don't exist:\n" +
+              v0.invalid.map((x) => `- ${x.reason}`).join("\n") +
+              "\nAddress only real node ids from the components list above. Valid colour tokens: " +
+              Object.keys(deck.theme.color).map((k) => `token://color/${k}`).join(", ") +
+              "\nRe-issue ONLY the corrected edits.";
+            const retry = await runChat(errMsg, deck, selection, apiKey, currentSlideId, undefined, !!openaiKey);
+            useOps = [...v0.valid, ...validateOps(deck, retry.ops).valid];
+          }
+
+          const expanded = await expandGenOps(useOps, deck, currentSlideId, selBox, selectedId);
           let applied = 0;
           if (expanded.length) {
             await commit(expanded);
