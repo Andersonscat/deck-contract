@@ -208,17 +208,18 @@ function renderBar(node: DeckNode): string {
   const kids = node.children;
   if (Array.isArray(kids)) {
     const val = kids.find((k) => k.type === "bar-value");
-    // the "fill" slot is normally the rectangle, but an image can structurally REPLACE it in-place
-    const fillN = kids.find((k) => k.type === "bar-fill" || k.type === "image-caption");
+    const fillN = kids.find((k) => k.type === "bar-fill");
     const lab = kids.find((k) => k.type === "bar-label");
     const col = ["flex:1 1 0%", "min-width:0", "display:flex", "flex-direction:column", "align-items:center", "height:100%", "gap:6px"];
     if (node.frame) col.unshift(frameToCss(node.frame));
     const roleAttr = node.role ? ` data-role="${esc(node.role)}"` : "";
     return (
       `<div data-cid="${esc(node.id)}" data-type="bar"${roleAttr} style="${esc(col.join(";"))}">` +
+      // plot area: value + fill stacked at the BOTTOM, so the value sits just above the bar (and
+      // tracks its top) rather than floating at the column top.
+      `<div style="flex:1;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-height:0;gap:4px">` +
       (val ? renderBarText(val, "bar-value", "var(--color-text)", true) : "") +
-      `<div style="flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center;min-height:0">` +
-      (fillN ? (fillN.type === "bar-fill" ? renderBarFill(fillN) : renderBarImage(fillN)) : "") +
+      (fillN ? renderBarFill(fillN) : "") +
       `</div>` +
       (lab ? renderBarText(lab, "bar-label", "var(--color-muted)", false) : "") +
       `</div>`
@@ -232,18 +233,6 @@ function renderBarText(n: DeckNode, type: string, fallback: string, bold: boolea
   const color = n.style?.color ? tokenToVar(n.style.color) : fallback;
   const roleAttr = n.role ? ` data-role="${esc(n.role)}"` : "";
   return `<div data-cid="${esc(n.id)}" data-type="${type}"${roleAttr} style="font-size:13px;line-height:1;${bold ? "font-weight:700;" : ""}color:${color}">${esc(String(t))}</div>`;
-}
-
-/** An image that has replaced a bar's fill — it lives INSIDE the bar (in the chart structure)
- * and fills the column's plot area, contained and bottom-aligned like a standing subject. */
-function renderBarImage(n: DeckNode): string {
-  const c = n.content ?? {};
-  const roleAttr = n.role ? ` data-role="${esc(n.role)}"` : "";
-  return (
-    `<figure data-cid="${esc(n.id)}" data-type="image-caption"${roleAttr} style="margin:0;width:100%;height:100%;display:flex;align-items:flex-end;justify-content:center;overflow:visible">` +
-    `<img draggable="false" style="width:100%;height:100%;object-fit:contain;object-position:bottom;background:transparent" src="${esc(c.src ?? "")}" alt="${esc(c.alt ?? "")}"/>` +
-    `</figure>`
-  );
 }
 
 function renderBarFill(n: DeckNode): string {

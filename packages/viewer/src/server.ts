@@ -291,14 +291,19 @@ export function createViewerServer(opts: ViewerOptions) {
           if (repEntry.node.type === "image-caption") {
             out.push({ op: "set_content", nodeId: repId, content: { src, alt } });
           } else if (repEntry.node.type === "bar-fill") {
-            // Structural replace: drop the image INSIDE the bar where the fill was (in flow, no
-            // frame), so it stays part of the chart tree — Bar chart > Bar > [Value, Image, Label].
+            // Structural, layout-safe replace: drop the orange rect and add the image as a FRAMED
+            // (absolute) child of the BAR-CHART, sitting over that bar's column. It is in the chart
+            // tree (Bar chart > [Bar x4, Image]) yet, being absolute, never disturbs the flex bars.
             const path = pathTo(deck, repId);
-            const bar = path && path.length >= 2 ? path[path.length - 2] : undefined;
-            const at = bar?.children?.findIndex((c) => c.id === repId) ?? -1;
-            if (bar && at >= 0) {
+            let chart: DeckNode | undefined, barNode: DeckNode | undefined;
+            if (path) for (let i = path.length - 1; i >= 0; i--) { if (path[i]!.type === "bar-chart") { chart = path[i]; barNode = path[i + 1]; break; } }
+            const bars = chart?.children?.filter((c) => c.type === "bar") ?? [];
+            const bi = barNode ? bars.findIndex((b) => b.id === barNode!.id) : -1;
+            if (chart && bi >= 0 && bars.length) {
+              const n = bars.length;
+              const colFrame = { x: Math.round((bi / n) * 1000) / 10, y: 8, w: Math.round((100 / n) * 10) / 10, h: 78 };
               out.push({ op: "remove_node", nodeId: repId });
-              out.push({ op: "insert_node", parentId: bar.id, index: at, node: { id: newId, type: "image-caption", role: "sticker", content: { src, alt } } as DeckNode });
+              out.push({ op: "insert_node", parentId: chart.id, index: 999, node: { id: newId, type: "image-caption", role: "sticker", content: { src, alt }, frame: colFrame } as DeckNode });
             } else {
               out.push({ op: "remove_node", nodeId: repId });
               out.push({ op: "insert_node", parentId: repEntry.slideId, index: 999, node: imgNode });
