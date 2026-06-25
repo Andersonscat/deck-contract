@@ -711,6 +711,13 @@ export const CLIENT_JS = `
   // parent as offsetParent, so the slide-relative drag/resize math doesn't apply — it is
   // structural (positioned by its container), not freely movable.
   function isFreeEl(el){ if(!el||el.tagName==='SECTION') return false; if(getComputedStyle(el).position!=='absolute') return false; var p=el.parentElement?el.parentElement.closest('#dc-stage [data-cid]'):null; return !p||p.tagName==='SECTION'; }
+  // Which selected objects get the standard 8-handle resize frame. Broader than isFreeEl: a FLOW
+  // element (text, bullet-list, image in a column) is resizable too — startResize freezes the
+  // slide and promotes it to a slide-level frame. The gate is that an absolute frame on it would
+  // resolve against the SLIDE (offsetParent === the section); that holds for free slide-children
+  // and for flow elements in static containers, but NOT for chart internals or anything nested in
+  // another positioned box (an image inside the chart), where slide-relative resize math is wrong.
+  function canResize(el){ if(!el||el.tagName==='SECTION') return false; var t=el.getAttribute('data-type'); if(t==='bar'||t==='bar-fill'||t==='bar-value'||t==='bar-label') return false; return !!el.offsetParent && el.offsetParent.tagName==='SECTION'; }
   stage.addEventListener('mousedown',function(e){ var el=e.target.closest('#dc-stage [data-cid]'); if(!el||el.tagName==='SECTION') return; var t=selectTarget(el); if(getComputedStyle(t).position==='absolute' && !isFreeEl(t)) return; candEl=t; downPt={x:e.clientX,y:e.clientY}; dragged=false; });
   document.addEventListener('mousemove',function(e){
     if(resizing){ doResize(e); return; }
@@ -874,10 +881,9 @@ export const CLIENT_JS = `
     // While you're INSIDE a group (editing its parts), don't show its resize handles — that's
     // clutter over the atoms. Esc out of the group to resize it.
     if(enteredCid&&sel.getAttribute('data-cid')===enteredCid){ hideHandles(); return; }
-    // Resize handles are only for FREE (framed, position:absolute) elements. Flow elements — bars,
-    // their atoms, an image inside a bar, container children — are laid out by their parent, so
-    // resizing them by hand is meaningless; show just the selection outline, no handles.
-    if(!isFreeEl(sel)){ hideHandles(); return; }
+    // Show the resize frame for any object that can carry a slide-level frame (free elements and
+    // promotable flow text/bullets/images) — not chart internals or nested-in-positioned boxes.
+    if(!canResize(sel)){ hideHandles(); return; }
     ensureHandles(); var r=sel.getBoundingClientRect();
     var pts={ nw:[r.left,r.top], n:[r.left+r.width/2,r.top], ne:[r.right,r.top], e:[r.right,r.top+r.height/2], se:[r.right,r.bottom], s:[r.left+r.width/2,r.bottom], sw:[r.left,r.bottom], w:[r.left,r.top+r.height/2] };
     HK.forEach(function(k){ var pt=pts[k]; handleDivs[k].style.left=(pt[0]-5)+'px'; handleDivs[k].style.top=(pt[1]-5)+'px'; });
