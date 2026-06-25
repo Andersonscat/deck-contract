@@ -90,8 +90,10 @@ export const CHROME_CSS = `
 .dc-h.ne,.dc-h.sw{ cursor:nesw-resize; }
 .dc-h.n,.dc-h.s{ cursor:ns-resize; }
 .dc-h.e,.dc-h.w{ cursor:ew-resize; }
-#dc-topbar{ position:relative; z-index:50; margin:12px 16px 6px; min-height:54px; flex:none; display:flex; align-items:center; gap:10px; padding:0 14px; background:#fff; border:1px solid #e6e8ee; border-radius:14px; overflow:visible; }
-#dc-tool{ display:flex; align-items:center; gap:12px; font:13px -apple-system,Segoe UI,sans-serif; color:#5b606b; white-space:nowrap; }
+#dc-topbar{ position:relative; z-index:50; margin:12px 16px 6px; min-height:54px; flex:none; display:flex; align-items:center; gap:10px; padding:8px 14px; background:#fff; border:1px solid #e6e8ee; border-radius:14px; overflow:visible; }
+/* adaptive: the contextual controls take the remaining width and WRAP to a new line when the
+   window/zoom shrinks, instead of overflowing across the chat panel. */
+#dc-tool{ flex:1 1 auto; min-width:0; display:flex; align-items:center; flex-wrap:wrap; gap:10px; row-gap:8px; font:13px -apple-system,Segoe UI,sans-serif; color:#5b606b; }
 #dc-tool.dc-empty{ color:#9aa0aa; }
 #dc-tool .dc-lbl{ color:#9298a3; font-size:11px; }
 #dc-history{ display:flex; gap:5px; padding-right:10px; margin-right:6px; border-right:1px solid #eef0f2; }
@@ -471,7 +473,9 @@ export const CLIENT_JS = `
     },function(){ opInFlight--; });
   }
 
-  window.addEventListener('resize',function(){ fitAll(); updateCurrent(); positionHandles(); });
+  // Zoom/resize rescales the slide, so any fixed-position overlay set at the old scale is now
+  // stale (the famous "blue box flies up on zoom"). Clear the hover boxes and re-place handles.
+  window.addEventListener('resize',function(){ fitAll(); updateCurrent(); hideBox(); hideWordHover(); positionHandles(); });
   stage.addEventListener('scroll',function(){ updateCurrent(); hideBox(); positionHandles(); });
   // Slides panel: click to jump, "+ New slide", and drag-to-reorder.
   var thumbWrap=document.getElementById('dc-thumbs');
