@@ -640,11 +640,16 @@ export const CLIENT_JS = `
   function showBox(el){ var h=hbox(); var r=el.getBoundingClientRect(); h.className=''; h.style.display='block'; h.style.left=r.left+'px'; h.style.top=r.top+'px'; h.style.width=r.width+'px'; h.style.height=r.height+'px'; }
   function hideBox(){ if(dragHover) dragHover.style.display='none'; }
   function round3(n){ return Math.round(n*1000)/1000; }
+  var NO_HOVER={'two-column':1,'container':1,'slide':1};
   stage.addEventListener('mousemove',function(e){ if(dragging) return;
     // Hover = exactly ONE level deeper than the current context. Inside an entered text node we
     // highlight only WORDS within THAT node; nothing else lights up. Otherwise: whole objects.
     if(enteredText){ var off=offsetAtPoint(enteredText,e.clientX,e.clientY); var wr=(off>=0)?wordRangeAt(enteredText.textContent||'',off):null; if(wr) showWordHover(enteredText,wr.from,wr.to); else hideWordHover(); hideBox(); return; }
-    var el=e.target.closest('#dc-stage [data-cid]'); var tgt=(el&&el.tagName!=='SECTION')?resolveTarget(el):null; if(tgt) showBox(tgt); else hideBox(); if(layersOn()) highlightLayer(tgt?tgt.getAttribute('data-cid'):null); });
+    var el=e.target.closest('#dc-stage [data-cid]'); var tgt=(el&&el.tagName!=='SECTION')?resolveTarget(el):null;
+    // Don't outline layout containers (two-column / container) — their big empty box over the
+    // slide reads as a misplaced frame. Highlight real content/objects only.
+    if(tgt&&!NO_HOVER[tgt.getAttribute('data-type')]) showBox(tgt); else hideBox();
+    if(layersOn()) highlightLayer(tgt?tgt.getAttribute('data-cid'):null); });
   stage.addEventListener('mouseleave',function(){ if(!dragging) hideBox(); if(layersOn()) highlightLayer(null); });
   // A "free" element is framed AND positioned by the slide itself (offsetParent = the section).
   // A framed element NESTED in another framed one (e.g. an image inside a bar-chart) has its
