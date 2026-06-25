@@ -966,8 +966,17 @@ export const CLIENT_JS = `
   var undoBtn=document.getElementById('dc-undo'), redoBtn=document.getElementById('dc-redo');
   function setHist(h){ if(undoBtn) undoBtn.disabled=!(h&&h.canUndo); if(redoBtn) redoBtn.disabled=!(h&&h.canRedo); }
   function refreshHist(){ fetch('/api/history').then(function(r){ return r.json(); }).then(setHist).catch(function(){}); }
-  function doUndo(){ post('/api/undo',{}).then(setHist); }
-  function doRedo(){ post('/api/redo',{}).then(setHist); }
+  // Undo/redo reconcile from the response and patch the slide DOM in place — like op() — instead of
+  // letting the fs-watch SSE rebuild (which felt like a full page reload). opSeq/opInFlight bump so
+  // the straddling softRefresh skips itself. Only a slide-COUNT change still needs a reload.
+  function applyHist(res){
+    if(!res) return; setHist(res);
+    if(res.css){ var th=document.getElementById('dc-theme'); if(th) th.textContent=res.css; }
+    if(res.type&&window.DC_THEME) window.DC_THEME.type=res.type;
+    if(res.slides){ if(res.slides.length!==frames.length){ location.reload(); return; } applySlides(res.slides,true); }
+  }
+  function doUndo(){ opSeq++; opInFlight++; post('/api/undo',{}).then(function(res){ opInFlight--; applyHist(res); },function(){ opInFlight--; }); }
+  function doRedo(){ opSeq++; opInFlight++; post('/api/redo',{}).then(function(res){ opInFlight--; applyHist(res); },function(){ opInFlight--; }); }
   if(undoBtn) undoBtn.onclick=function(ev){ ev.stopPropagation(); doUndo(); };
   if(redoBtn) redoBtn.onclick=function(ev){ ev.stopPropagation(); doRedo(); };
   document.getElementById('dc-chat-form').addEventListener('submit',function(e){ e.preventDefault();

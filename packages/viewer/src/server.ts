@@ -535,7 +535,12 @@ export function createViewerServer(opts: ViewerOptions) {
         const { deck: next, inverse } = apply(await readDeck(), inv);
         await writeDeck(next);
         redoStack.push(inverse);
-        return json({ ok: true, ...hist() });
+        // Return the recompiled slides so the client patches in place (no page reload), like /api/op.
+        const { css, slides } = compileSlides(next);
+        const type = Object.fromEntries(
+          Object.entries(next.theme.type).map(([k, v]) => [k, parseInt(v as string, 10) || v]),
+        );
+        return json({ ok: true, ...hist(), slides, css, type });
       }
       if (req.method === "POST" && url === "/api/redo") {
         const r = redoStack.pop();
@@ -543,7 +548,11 @@ export function createViewerServer(opts: ViewerOptions) {
         const { deck: next, inverse } = apply(await readDeck(), r);
         await writeDeck(next);
         undoStack.push(inverse);
-        return json({ ok: true, ...hist() });
+        const { css, slides } = compileSlides(next);
+        const type = Object.fromEntries(
+          Object.entries(next.theme.type).map(([k, v]) => [k, parseInt(v as string, 10) || v]),
+        );
+        return json({ ok: true, ...hist(), slides, css, type });
       }
       if (req.method === "GET" && url === "/api/history") return json(hist());
       if (req.method === "POST" && url === "/api/selection" && opts.selectionPath) {
