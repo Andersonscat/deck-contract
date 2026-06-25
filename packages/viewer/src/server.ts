@@ -290,6 +290,19 @@ export function createViewerServer(opts: ViewerOptions) {
         if (repEntry && repId) {
           if (repEntry.node.type === "image-caption") {
             out.push({ op: "set_content", nodeId: repId, content: { src, alt } });
+          } else if (repEntry.node.type === "bar-fill") {
+            // Structural replace: drop the image INSIDE the bar where the fill was (in flow, no
+            // frame), so it stays part of the chart tree — Bar chart > Bar > [Value, Image, Label].
+            const path = pathTo(deck, repId);
+            const bar = path && path.length >= 2 ? path[path.length - 2] : undefined;
+            const at = bar?.children?.findIndex((c) => c.id === repId) ?? -1;
+            if (bar && at >= 0) {
+              out.push({ op: "remove_node", nodeId: repId });
+              out.push({ op: "insert_node", parentId: bar.id, index: at, node: { id: newId, type: "image-caption", role: "sticker", content: { src, alt } } as DeckNode });
+            } else {
+              out.push({ op: "remove_node", nodeId: repId });
+              out.push({ op: "insert_node", parentId: repEntry.slideId, index: 999, node: imgNode });
+            }
           } else {
             // swap the element for the image, placed where it lived (on its slide as a free node)
             out.push({ op: "remove_node", nodeId: repId });
